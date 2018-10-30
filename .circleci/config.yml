@@ -1,0 +1,11 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.11.1
+    steps:
+      - checkout
+      - run: go get golang.org/x/lint/golint
+      - run: golint -set_exit_status ./...
+      - run: go vet
+      - run: go test -v ./...
