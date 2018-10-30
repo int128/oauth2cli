@@ -2,7 +2,12 @@ package oauth2cli_test
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
 
 	"github.com/int128/oauth2cli"
 	"golang.org/x/oauth2"
@@ -28,4 +33,114 @@ func ExampleAuthCodeFlow() {
 		log.Fatalf("Could not get a token: %s", err)
 	}
 	log.Printf("Got access token %s", token.AccessToken)
+}
+
+func TestAuthCodeFlow_GetToken(t *testing.T) {
+	h := authServerHandler{
+		AuthCode:     "AUTH_CODE",
+		Scope:        "email",
+		AccessToken:  "ACCESS_TOKEN",
+		RefreshToken: "REFRESH_TOKEN",
+	}
+	s := httptest.NewServer(&h)
+	defer s.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	flow := oauth2cli.AuthCodeFlow{
+		Config: oauth2.Config{
+			ClientID:     "YOUR_CLIENT_ID",
+			ClientSecret: "YOUR_CLIENT_SECRET",
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  s.URL + "/auth",
+				TokenURL: s.URL + "/token",
+			},
+			Scopes: []string{"email"},
+		},
+		SkipOpenBrowser: true,
+	}
+
+	ch := make(chan struct{})
+	go func() {
+		defer close(ch)
+		token, err := flow.GetToken(ctx)
+		if err != nil {
+			t.Errorf("Could not get a token: %s", err)
+			return
+		}
+		if h.AccessToken != token.AccessToken {
+			t.Errorf("AccessToken wants %s but %s", h.AccessToken, token.AccessToken)
+		}
+		if h.RefreshToken != token.RefreshToken {
+			t.Errorf("RefreshToken wants %s but %s", h.AccessToken, token.AccessToken)
+		}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	if err := openBrowserRequest(flow.Config.RedirectURL); err != nil {
+		cancel()
+		t.Errorf("Could not open browser request: %s", err)
+	}
+	select {
+	case <-ch:
+	}
+}
+
+func openBrowserRequest(url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("Could not send a request: %s", err)
+	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("StatusCode wants 200 but %d", resp.StatusCode)
+	}
+	return nil
+}
+
+type authServerHandler struct {
+	Scope        string
+	AuthCode     string
+	AccessToken  string
+	RefreshToken string
+}
+
+func (h *authServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if err := h.serveHTTP(w, r); err != nil {
+		log.Printf("[authServer] Error: %s", err)
+		w.WriteHeader(500)
+	}
+}
+
+func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) error {
+	switch {
+	case r.Method == "GET" && r.URL.Path == "/auth":
+		q := r.URL.Query()
+		if h.Scope != q.Get("scope") {
+			return fmt.Errorf("scope wants %s but %s", h.Scope, q.Get("scope"))
+		}
+		to := fmt.Sprintf("%s?state=%s&code=%s", q.Get("redirect_uri"), q.Get("state"), h.AuthCode)
+		http.Redirect(w, r, to, 302)
+
+	case r.Method == "POST" && r.URL.Path == "/token":
+		if err := r.ParseForm(); err != nil {
+			return fmt.Errorf("Could not parse form: %s", err)
+		}
+		if h.AuthCode != r.Form.Get("code") {
+			return fmt.Errorf("code wants %s but %s", h.AuthCode, r.Form.Get("code"))
+		}
+		w.Header().Add("Content-Type", "application/json")
+		b := fmt.Sprintf(`{
+			"access_token": "%s",
+			"token_type": "Bearer",
+			"expires_in": 3600,
+			"refresh_token": "%s"
+		}`, h.AccessToken, h.RefreshToken)
+		if _, err := w.Write([]byte(b)); err != nil {
+			return fmt.Errorf("Could not write body: %s", err)
+		}
+
+	default:
+		http.Error(w, "Not Found", 404)
+	}
+	return nil
 }
