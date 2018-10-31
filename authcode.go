@@ -4,10 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/pkg/browser"
@@ -17,18 +14,37 @@ import (
 // AuthCodeFlow provides flow with OAuth 2.0 Authorization Code Grant.
 // See https://tools.ietf.org/html/rfc6749#section-4.1
 type AuthCodeFlow struct {
-	// OAuth2 configuration.
-	// RedirectURL will be set to "http://localhost:port" if it is empty.
-	Config oauth2.Config
-
+	Config          oauth2.Config           // OAuth2 config.
 	AuthCodeOptions []oauth2.AuthCodeOption // Options passed to AuthCodeURL().
-	ServerPort      int                     // HTTP server port. Default to a random port.
+	LocalServerPort int                     // Local server port. Default to a random port.
 	SkipOpenBrowser bool                    // Skip opening browser if it is true.
+
+	ShowLocalServerURL func(url string) // Called when the local server is started. Default to show a message via the logger.
 }
 
-// GetToken retrieves a token from the provider.
+// GetToken performs Authorization Grant Flow and returns a token got from the provider.
+//
+// This does the following steps:
+//
+// 1. Start a local server at the port.
+// 2. Open browser and navigate to the local server.
+// 3. (User authorization)
+// 4. Receive a code via an authorization response (HTTP redirect).
+// 5. Exchange the code and a token.
+// 6. Return the code.
+//
+// Note that this will change Config.RedirectURL to "http://localhost:port" if it is empty.
+//
 func (f *AuthCodeFlow) GetToken(ctx context.Context) (*oauth2.Token, error) {
-	code, err := f.getAuthCode(ctx)
+	listener, err := newLocalhostListener(f.LocalServerPort)
+	if err != nil {
+		return nil, fmt.Errorf("Could not listen to port: %s", err)
+	}
+	defer listener.Close()
+	if f.Config.RedirectURL == "" {
+		f.Config.RedirectURL = listener.URL
+	}
+	code, err := f.getCode(ctx, listener)
 	if err != nil {
 		return nil, fmt.Errorf("Could not get an auth code: %s", err)
 	}
@@ -39,7 +55,7 @@ func (f *AuthCodeFlow) GetToken(ctx context.Context) (*oauth2.Token, error) {
 	return token, nil
 }
 
-func (f *AuthCodeFlow) getAuthCode(ctx context.Context) (string, error) {
+func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener) (string, error) {
 	state, err := newOAuth2State()
 	if err != nil {
 		return "", fmt.Errorf("Could not generate state parameter: %s", err)
@@ -48,25 +64,10 @@ func (f *AuthCodeFlow) getAuthCode(ctx context.Context) (string, error) {
 	defer close(codeCh)
 	errCh := make(chan error)
 	defer close(errCh)
-
-	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", f.ServerPort))
-	if err != nil {
-		return "", fmt.Errorf("Could not listen to port %d", f.ServerPort)
-	}
-	defer listener.Close()
-	port, err := extractPort(listener.Addr())
-	if err != nil {
-		return "", fmt.Errorf("Could not determine listening port: %s", err)
-	}
-	log.Printf("Listening to port %d", port)
-	if f.Config.RedirectURL == "" {
-		f.Config.RedirectURL = fmt.Sprintf("http://localhost:%d/", port)
-	}
-
-	server := &http.Server{
-		Handler: &authCodeHandler{
+	server := http.Server{
+		Handler: &authCodeFlowHandler{
 			authCodeURL: f.Config.AuthCodeURL(string(state), f.AuthCodeOptions...),
-			gotCode: func(code string, gotState oauth2State) {
+			gotCode: func(code string, gotState string) {
 				if gotState == state {
 					codeCh <- code
 				} else {
@@ -85,10 +86,14 @@ func (f *AuthCodeFlow) getAuthCode(ctx context.Context) (string, error) {
 		}
 	}()
 	go func() {
-		log.Printf("Open http://localhost:%d for authorization", port)
+		time.Sleep(500 * time.Millisecond)
+		if f.ShowLocalServerURL != nil {
+			f.ShowLocalServerURL(listener.URL)
+		} else {
+			log.Printf("Open %s for authorization", listener.URL)
+		}
 		if !f.SkipOpenBrowser {
-			time.Sleep(500 * time.Millisecond)
-			browser.OpenURL(fmt.Sprintf("http://localhost:%d/", port))
+			browser.OpenURL(listener.URL)
 		}
 	}()
 	select {
@@ -97,44 +102,29 @@ func (f *AuthCodeFlow) getAuthCode(ctx context.Context) (string, error) {
 	case code := <-codeCh:
 		return code, nil
 	case <-ctx.Done():
-		return "", ctx.Err()
+		return "", fmt.Errorf("Context done while waiting for authorization response: %s", ctx.Err())
 	}
 }
 
-func extractPort(addr net.Addr) (int, error) {
-	s := strings.SplitN(addr.String(), ":", 2)
-	if len(s) != 2 {
-		return 0, fmt.Errorf("Invalid address: %s", addr)
-	}
-	p, err := strconv.Atoi(s[1])
-	if err != nil {
-		return 0, fmt.Errorf("Not number %s: %s", addr, err)
-	}
-	return p, nil
-}
-
-type authCodeHandler struct {
+type authCodeFlowHandler struct {
 	authCodeURL string
-	gotCode     func(code string, state oauth2State)
+	gotCode     func(code string, state string)
 	gotError    func(err error)
 }
 
-func (h *authCodeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s", r.Method, r.RequestURI)
-	m := r.Method
-	p := r.URL.Path
+func (h *authCodeFlowHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	switch {
-	case m == "GET" && p == "/" && q.Get("error") != "":
+	case r.Method == "GET" && r.URL.Path == "/" && q.Get("error") != "":
 		h.gotError(fmt.Errorf("OAuth Error: %s %s", q.Get("error"), q.Get("error_description")))
 		http.Error(w, "OAuth Error", 500)
 
-	case m == "GET" && p == "/" && q.Get("code") != "":
-		h.gotCode(q.Get("code"), oauth2State(q.Get("state")))
+	case r.Method == "GET" && r.URL.Path == "/" && q.Get("code") != "":
+		h.gotCode(q.Get("code"), q.Get("state"))
 		w.Header().Add("Content-Type", "text/html")
 		fmt.Fprintf(w, `<html><body>OK<script>window.close()</script></body></html>`)
 
-	case m == "GET" && p == "/":
+	case r.Method == "GET" && r.URL.Path == "/":
 		http.Redirect(w, r, h.authCodeURL, 302)
 
 	default:

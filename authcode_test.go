@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/int128/oauth2cli"
 	"golang.org/x/oauth2"
@@ -36,6 +35,7 @@ func ExampleAuthCodeFlow() {
 }
 
 func TestAuthCodeFlow_GetToken(t *testing.T) {
+	// Start an auth server.
 	h := authServerHandler{
 		AuthCode:     "AUTH_CODE",
 		Scope:        "email",
@@ -44,45 +44,50 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 	}
 	s := httptest.NewServer(&h)
 	defer s.Close()
+	endpoint := oauth2.Endpoint{
+		AuthURL:  s.URL + "/auth",
+		TokenURL: s.URL + "/token",
+	}
 
+	// Wait for the local server and open a browser request.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	openBrowserCh := make(chan string)
+	go func() {
+		select {
+		case url := <-openBrowserCh:
+			if err := openBrowserRequest(url); err != nil {
+				cancel()
+				t.Errorf("Could not open browser request: %s", err)
+			}
+		case <-ctx.Done():
+			t.Errorf("Context done while waiting for opening browser: %s", ctx.Err())
+		}
+	}()
+
+	// Start a local server and get a token.
 	flow := oauth2cli.AuthCodeFlow{
 		Config: oauth2.Config{
 			ClientID:     "YOUR_CLIENT_ID",
 			ClientSecret: "YOUR_CLIENT_SECRET",
-			Endpoint: oauth2.Endpoint{
-				AuthURL:  s.URL + "/auth",
-				TokenURL: s.URL + "/token",
-			},
-			Scopes: []string{"email"},
+			Endpoint:     endpoint,
+			Scopes:       []string{"email"},
 		},
 		SkipOpenBrowser: true,
+		ShowLocalServerURL: func(url string) {
+			openBrowserCh <- url
+		},
 	}
-
-	ch := make(chan struct{})
-	go func() {
-		defer close(ch)
-		token, err := flow.GetToken(ctx)
-		if err != nil {
-			t.Errorf("Could not get a token: %s", err)
-			return
-		}
-		if h.AccessToken != token.AccessToken {
-			t.Errorf("AccessToken wants %s but %s", h.AccessToken, token.AccessToken)
-		}
-		if h.RefreshToken != token.RefreshToken {
-			t.Errorf("RefreshToken wants %s but %s", h.AccessToken, token.AccessToken)
-		}
-	}()
-
-	time.Sleep(50 * time.Millisecond)
-	if err := openBrowserRequest(flow.Config.RedirectURL); err != nil {
-		cancel()
-		t.Errorf("Could not open browser request: %s", err)
+	token, err := flow.GetToken(ctx)
+	if err != nil {
+		t.Errorf("Could not get a token: %s", err)
+		return
 	}
-	select {
-	case <-ch:
+	if h.AccessToken != token.AccessToken {
+		t.Errorf("AccessToken wants %s but %s", h.AccessToken, token.AccessToken)
+	}
+	if h.RefreshToken != token.RefreshToken {
+		t.Errorf("RefreshToken wants %s but %s", h.AccessToken, token.AccessToken)
 	}
 }
 
