@@ -31,7 +31,7 @@ func ExampleAuthCodeFlow() {
 	if err != nil {
 		log.Fatalf("Could not get a token: %s", err)
 	}
-	log.Printf("Got access token %s", token.AccessToken)
+    log.Printf("Got a token: %+v", token)
 }
 
 func TestAuthCodeFlow_GetToken(t *testing.T) {

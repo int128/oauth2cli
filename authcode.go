@@ -28,7 +28,7 @@ type AuthCodeFlow struct {
 //
 // 1. Start a local server at the port.
 // 2. Open browser and navigate to the local server.
-// 3. (User authorization)
+// 3. Wait for user authorization.
 // 4. Receive a code via an authorization response (HTTP redirect).
 // 5. Exchange the code and a token.
 // 6. Return the code.
