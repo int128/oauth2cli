@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/browser"
+	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 )
 
@@ -38,7 +39,7 @@ type AuthCodeFlow struct {
 func (f *AuthCodeFlow) GetToken(ctx context.Context) (*oauth2.Token, error) {
 	listener, err := newLocalhostListener(f.LocalServerPort)
 	if err != nil {
-		return nil, fmt.Errorf("Could not listen to port: %s", err)
+		return nil, errors.Wrapf(err, "error while listening on port %d", f.LocalServerPort)
 	}
 	defer listener.Close()
 	if f.Config.RedirectURL == "" {
@@ -46,11 +47,11 @@ func (f *AuthCodeFlow) GetToken(ctx context.Context) (*oauth2.Token, error) {
 	}
 	code, err := f.getCode(ctx, listener)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get an auth code: %s", err)
+		return nil, errors.Wrapf(err, "error while getting an auth code")
 	}
 	token, err := f.Config.Exchange(ctx, code)
 	if err != nil {
-		return nil, fmt.Errorf("Could not exchange token: %s", err)
+		return nil, errors.Wrapf(err, "error while exchange of code and token")
 	}
 	return token, nil
 }
@@ -58,7 +59,7 @@ func (f *AuthCodeFlow) GetToken(ctx context.Context) (*oauth2.Token, error) {
 func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener) (string, error) {
 	state, err := newOAuth2State()
 	if err != nil {
-		return "", fmt.Errorf("Could not generate state parameter: %s", err)
+		return "", errors.Wrapf(err, "error while state parameter generation")
 	}
 	codeCh := make(chan string)
 	defer close(codeCh)
@@ -71,7 +72,7 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener)
 				if gotState == state {
 					codeCh <- code
 				} else {
-					errCh <- fmt.Errorf("State does not match, wants %s but %s", state, gotState)
+					errCh <- errors.Errorf("state does not match, wants %s but %s", state, gotState)
 				}
 			},
 			gotError: func(err error) {
@@ -102,7 +103,7 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener)
 	case code := <-codeCh:
 		return code, nil
 	case <-ctx.Done():
-		return "", fmt.Errorf("Context done while waiting for authorization response: %s", ctx.Err())
+		return "", errors.Wrapf(ctx.Err(), "context done while waiting for authorization response")
 	}
 }
 

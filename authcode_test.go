@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/int128/oauth2cli"
+	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 )
 
@@ -31,7 +32,7 @@ func ExampleAuthCodeFlow() {
 	if err != nil {
 		log.Fatalf("Could not get a token: %s", err)
 	}
-    log.Printf("Got a token: %+v", token)
+	log.Printf("Got a token: %+v", token)
 }
 
 func TestAuthCodeFlow_GetToken(t *testing.T) {
@@ -50,7 +51,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 	}
 
 	// Wait for the local server and open a browser request.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 	openBrowserCh := make(chan string)
 	go func() {
@@ -58,10 +59,10 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 		case url := <-openBrowserCh:
 			if err := openBrowserRequest(url); err != nil {
 				cancel()
-				t.Errorf("Could not open browser request: %s", err)
+				t.Errorf("Could not open browser request: %+v", err)
 			}
 		case <-ctx.Done():
-			t.Errorf("Context done while waiting for opening browser: %s", ctx.Err())
+			t.Errorf("Context done while waiting for opening browser: %+v", ctx.Err())
 		}
 	}()
 
@@ -80,7 +81,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 	}
 	token, err := flow.GetToken(ctx)
 	if err != nil {
-		t.Errorf("Could not get a token: %s", err)
+		t.Errorf("Could not get a token: %+v", err)
 		return
 	}
 	if h.AccessToken != token.AccessToken {
@@ -94,10 +95,10 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 func openBrowserRequest(url string) error {
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("Could not send a request: %s", err)
+		return errors.Wrapf(err, "error while sending a request")
 	}
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("StatusCode wants 200 but %d", resp.StatusCode)
+		return errors.Errorf("StatusCode wants 200 but %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -128,10 +129,10 @@ func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) er
 
 	case r.Method == "POST" && r.URL.Path == "/token":
 		if err := r.ParseForm(); err != nil {
-			return fmt.Errorf("Could not parse form: %s", err)
+			return errors.Wrapf(err, "error while parsing form")
 		}
 		if h.AuthCode != r.Form.Get("code") {
-			return fmt.Errorf("code wants %s but %s", h.AuthCode, r.Form.Get("code"))
+			return errors.Errorf("code wants %s but %s", h.AuthCode, r.Form.Get("code"))
 		}
 		w.Header().Add("Content-Type", "application/json")
 		b := fmt.Sprintf(`{
@@ -141,7 +142,7 @@ func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) er
 			"refresh_token": "%s"
 		}`, h.AccessToken, h.RefreshToken)
 		if _, err := w.Write([]byte(b)); err != nil {
-			return fmt.Errorf("Could not write body: %s", err)
+			return errors.Wrapf(err, "error while writing body")
 		}
 
 	default:
