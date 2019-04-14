@@ -103,7 +103,7 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener)
 		}
 		if !f.SkipOpenBrowser {
 			time.Sleep(500 * time.Millisecond)
-			browser.OpenURL(listener.URL)
+			_ = browser.OpenURL(listener.URL)
 		}
 	}()
 	select {
@@ -126,13 +126,15 @@ func (h *authCodeFlowHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	q := r.URL.Query()
 	switch {
 	case r.Method == "GET" && r.URL.Path == "/" && q.Get("error") != "":
-		h.gotError(fmt.Errorf("OAuth Error: %s %s", q.Get("error"), q.Get("error_description")))
+		h.gotError(errors.Errorf("OAuth Error: %s %s", q.Get("error"), q.Get("error_description")))
 		http.Error(w, "OAuth Error", 500)
 
 	case r.Method == "GET" && r.URL.Path == "/" && q.Get("code") != "":
 		h.gotCode(q.Get("code"), q.Get("state"))
 		w.Header().Add("Content-Type", "text/html")
-		fmt.Fprintf(w, `<html><body>OK<script>window.close()</script></body></html>`)
+		if _, err := fmt.Fprintf(w, `<html><body>OK<script>window.close()</script></body></html>`); err != nil {
+			h.gotError(errors.Wrapf(err, "error while writing response body"))
+		}
 
 	case r.Method == "GET" && r.URL.Path == "/":
 		http.Redirect(w, r, h.authCodeURL, 302)
