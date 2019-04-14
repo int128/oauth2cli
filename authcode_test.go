@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/int128/oauth2cli"
 	"github.com/pkg/errors"
@@ -51,7 +52,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 	}
 
 	// Wait for the local server and open a browser request.
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
 	defer cancel()
 	openBrowserCh := make(chan string)
 	go func() {

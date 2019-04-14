@@ -140,6 +140,6 @@ func (h *authCodeFlowHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		http.Redirect(w, r, h.authCodeURL, 302)
 
 	default:
-		http.Error(w, "Not Found", 404)
+		http.NotFound(w, r)
 	}
 }
