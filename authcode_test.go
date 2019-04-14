@@ -78,6 +78,12 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 		ShowLocalServerURL: func(url string) {
 			openBrowserCh <- url
 		},
+		LocalServerMiddleware: func(h http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Logf("%s %s", r.Method, r.URL)
+				h.ServeHTTP(w, r)
+			})
+		},
 	}
 	token, err := flow.GetToken(ctx)
 	if err != nil {

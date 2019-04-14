@@ -11,6 +11,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
+var defaultMiddleware = func(h http.Handler) http.Handler {
+	return h
+}
+
 // AuthCodeFlow provides flow with OAuth 2.0 Authorization Code Grant.
 // See https://tools.ietf.org/html/rfc6749#section-4.1
 type AuthCodeFlow struct {
@@ -21,6 +25,9 @@ type AuthCodeFlow struct {
 
 	// Called when the local server is started. Default to none.
 	ShowLocalServerURL func(url string)
+
+	// Middleware for the local server. Default to none.
+	LocalServerMiddleware func(h http.Handler) http.Handler
 }
 
 // GetToken performs Authorization Grant Flow and returns a token got from the provider.
@@ -61,12 +68,16 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener)
 	if err != nil {
 		return "", errors.Wrapf(err, "error while state parameter generation")
 	}
+	middleware := defaultMiddleware
+	if f.LocalServerMiddleware != nil {
+		middleware = f.LocalServerMiddleware
+	}
 	codeCh := make(chan string)
 	defer close(codeCh)
 	errCh := make(chan error)
 	defer close(errCh)
 	server := http.Server{
-		Handler: &authCodeFlowHandler{
+		Handler: middleware(&authCodeFlowHandler{
 			authCodeURL: f.Config.AuthCodeURL(string(state), f.AuthCodeOptions...),
 			gotCode: func(code string, gotState string) {
 				if gotState == state {
@@ -78,7 +89,7 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener)
 			gotError: func(err error) {
 				errCh <- err
 			},
-		},
+		}),
 	}
 	defer server.Shutdown(ctx)
 	go func() {
