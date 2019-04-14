@@ -3,7 +3,6 @@ package oauth2cli
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -20,7 +19,8 @@ type AuthCodeFlow struct {
 	LocalServerPort int                     // Local server port. Default to a random port.
 	SkipOpenBrowser bool                    // Skip opening browser if it is true.
 
-	ShowLocalServerURL func(url string) // Called when the local server is started. Default to show a message via the logger.
+	// Called when the local server is started. Default to none.
+	ShowLocalServerURL func(url string)
 }
 
 // GetToken performs Authorization Grant Flow and returns a token got from the provider.
@@ -87,13 +87,11 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener)
 		}
 	}()
 	go func() {
-		time.Sleep(500 * time.Millisecond)
 		if f.ShowLocalServerURL != nil {
 			f.ShowLocalServerURL(listener.URL)
-		} else {
-			log.Printf("Open %s for authorization", listener.URL)
 		}
 		if !f.SkipOpenBrowser {
+			time.Sleep(500 * time.Millisecond)
 			browser.OpenURL(listener.URL)
 		}
 	}()
