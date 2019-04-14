@@ -15,13 +15,13 @@ var defaultMiddleware = func(h http.Handler) http.Handler {
 	return h
 }
 
-// AuthCodeFlow provides flow with OAuth 2.0 Authorization Code Grant.
+// AuthCodeFlow provides the flow with OAuth 2.0 Authorization Code Grant.
 // See https://tools.ietf.org/html/rfc6749#section-4.1
 type AuthCodeFlow struct {
 	Config          oauth2.Config           // OAuth2 config.
-	AuthCodeOptions []oauth2.AuthCodeOption // Options passed to AuthCodeURL().
+	AuthCodeOptions []oauth2.AuthCodeOption // OAuth2 options.
 	LocalServerPort int                     // Local server port. Default to a random port.
-	SkipOpenBrowser bool                    // Skip opening browser if it is true.
+	SkipOpenBrowser bool                    // If set, skip opening browser.
 
 	// Called when the local server is started. Default to none.
 	ShowLocalServerURL func(url string)
@@ -30,16 +30,16 @@ type AuthCodeFlow struct {
 	LocalServerMiddleware func(h http.Handler) http.Handler
 }
 
-// GetToken performs Authorization Grant Flow and returns a token got from the provider.
+// GetToken performs the Authorization Grant Flow and returns a token got from the provider.
 //
 // This does the following steps:
 //
-// 1. Start a local server at the port.
-// 2. Open browser and navigate to the local server.
-// 3. Wait for user authorization.
-// 4. Receive a code via an authorization response (HTTP redirect).
-// 5. Exchange the code and a token.
-// 6. Return the code.
+//	1. Start a local server at the port.
+//	2. Open a browser and navigate it to the local server.
+//	3. Wait for the user authorization.
+// 	4. Receive a code via an authorization response (HTTP redirect).
+// 	5. Exchange the code and a token.
+// 	6. Return the code.
 //
 // Note that this will change Config.RedirectURL to "http://localhost:port" if it is empty.
 //

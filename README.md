@@ -9,6 +9,8 @@ See [GoDoc](https://godoc.org/github.com/int128/oauth2cli).
 ## TL;DR
 
 ```go
+package main
+
 import (
 	"context"
 	"log"
