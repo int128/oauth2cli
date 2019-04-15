@@ -72,6 +72,7 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener)
 	if f.LocalServerMiddleware != nil {
 		middleware = f.LocalServerMiddleware
 	}
+
 	codeCh := make(chan string)
 	defer close(codeCh)
 	errCh := make(chan error)
@@ -92,18 +93,19 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener)
 		}),
 	}
 	defer server.Shutdown(ctx)
+
+	if f.ShowLocalServerURL != nil {
+		f.ShowLocalServerURL(listener.URL)
+	}
+	if !f.SkipOpenBrowser {
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			_ = browser.OpenURL(listener.URL)
+		}()
+	}
 	go func() {
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			errCh <- err
-		}
-	}()
-	go func() {
-		if f.ShowLocalServerURL != nil {
-			f.ShowLocalServerURL(listener.URL)
-		}
-		if !f.SkipOpenBrowser {
-			time.Sleep(500 * time.Millisecond)
-			_ = browser.OpenURL(listener.URL)
 		}
 	}()
 	select {
