@@ -15,13 +15,17 @@ var defaultMiddleware = func(h http.Handler) http.Handler {
 	return h
 }
 
+// AuthCodeFlowSuccessResponse is a default response body on authorization success.
+const AuthCodeFlowSuccessResponse = `<html><body>OK<script>window.close()</script></body></html>`
+
 // AuthCodeFlow provides the flow with OAuth 2.0 Authorization Code Grant.
 // See https://tools.ietf.org/html/rfc6749#section-4.1
 type AuthCodeFlow struct {
-	Config          oauth2.Config           // OAuth2 config.
-	AuthCodeOptions []oauth2.AuthCodeOption // OAuth2 options.
-	LocalServerPort int                     // Local server port. Default to a random port.
-	SkipOpenBrowser bool                    // If set, skip opening browser.
+	Config                     oauth2.Config           // OAuth2 config.
+	AuthCodeOptions            []oauth2.AuthCodeOption // OAuth2 options.
+	LocalServerPort            int                     // Local server port. Default to a random port.
+	LocalServerSuccessResponse string                  // Response body on authorization success. Default to AuthCodeFlowSuccessResponse.
+	SkipOpenBrowser            bool                    // If set, skip opening browser.
 
 	// Called when the local server is started. Default to none.
 	ShowLocalServerURL func(url string)
@@ -67,9 +71,13 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener,
 	if err != nil {
 		return "", errors.Wrapf(err, "error while state parameter generation")
 	}
-	middleware := defaultMiddleware
-	if f.LocalServerMiddleware != nil {
-		middleware = f.LocalServerMiddleware
+	middleware := f.LocalServerMiddleware
+	if middleware == nil {
+		middleware = defaultMiddleware
+	}
+	successResponse := f.LocalServerSuccessResponse
+	if successResponse == "" {
+		successResponse = AuthCodeFlowSuccessResponse
 	}
 
 	codeCh := make(chan string)
@@ -81,6 +89,7 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener,
 			config:          config,
 			authCodeOptions: f.AuthCodeOptions,
 			state:           state,
+			successResponse: successResponse,
 			gotCode:         codeCh,
 			gotError:        errCh,
 		}),
@@ -115,6 +124,7 @@ type authCodeFlowHandler struct {
 	config          oauth2.Config
 	authCodeOptions []oauth2.AuthCodeOption
 	state           string
+	successResponse string
 	gotCode         chan<- string
 	gotError        chan<- error
 }
@@ -148,7 +158,7 @@ func (h *authCodeFlowHandler) handleCodeResponse(w http.ResponseWriter, r *http.
 		return
 	}
 	w.Header().Add("Content-Type", "text/html")
-	if _, err := fmt.Fprintf(w, `<html><body>OK<script>window.close()</script></body></html>`); err != nil {
+	if _, err := fmt.Fprintf(w, h.successResponse); err != nil {
 		http.Error(w, "server error", 500)
 		h.gotError <- errors.Wrapf(err, "error while writing response body")
 		return
