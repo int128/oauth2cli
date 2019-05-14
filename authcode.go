@@ -41,29 +41,28 @@ type AuthCodeFlow struct {
 // 	5. Exchange the code and a token.
 // 	6. Return the code.
 //
-// Note that this will change Config.RedirectURL to "http://localhost:port" if it is empty.
-//
 func (f *AuthCodeFlow) GetToken(ctx context.Context) (*oauth2.Token, error) {
 	listener, err := newLocalhostListener(f.LocalServerPort)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error while listening on port %d", f.LocalServerPort)
 	}
 	defer listener.Close()
-	if f.Config.RedirectURL == "" {
-		f.Config.RedirectURL = listener.URL
+	config := f.Config
+	if config.RedirectURL == "" {
+		config.RedirectURL = listener.URL
 	}
-	code, err := f.getCode(ctx, listener)
+	code, err := f.getCode(ctx, listener, config)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while getting an auth code")
+		return nil, errors.Wrapf(err, "error while receiving an authorization code")
 	}
-	token, err := f.Config.Exchange(ctx, code)
+	token, err := config.Exchange(ctx, code)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while exchange of code and token")
+		return nil, errors.Wrapf(err, "error while exchanging authorization code and token")
 	}
 	return token, nil
 }
 
-func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener) (string, error) {
+func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener, config oauth2.Config) (string, error) {
 	state, err := newOAuth2State()
 	if err != nil {
 		return "", errors.Wrapf(err, "error while state parameter generation")
@@ -79,17 +78,11 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener)
 	defer close(errCh)
 	server := http.Server{
 		Handler: middleware(&authCodeFlowHandler{
-			authCodeURL: f.Config.AuthCodeURL(string(state), f.AuthCodeOptions...),
-			gotCode: func(code string, gotState string) {
-				if gotState == state {
-					codeCh <- code
-				} else {
-					errCh <- errors.Errorf("state does not match, wants %s but %s", state, gotState)
-				}
-			},
-			gotError: func(err error) {
-				errCh <- err
-			},
+			config:          config,
+			authCodeOptions: f.AuthCodeOptions,
+			state:           state,
+			gotCode:         codeCh,
+			gotError:        errCh,
 		}),
 	}
 	defer server.Shutdown(ctx)
@@ -119,29 +112,54 @@ func (f *AuthCodeFlow) getCode(ctx context.Context, listener *localhostListener)
 }
 
 type authCodeFlowHandler struct {
-	authCodeURL string
-	gotCode     func(code string, state string)
-	gotError    func(err error)
+	config          oauth2.Config
+	authCodeOptions []oauth2.AuthCodeOption
+	state           string
+	gotCode         chan<- string
+	gotError        chan<- error
 }
 
 func (h *authCodeFlowHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	switch {
 	case r.Method == "GET" && r.URL.Path == "/" && q.Get("error") != "":
-		h.gotError(errors.Errorf("OAuth Error: %s %s", q.Get("error"), q.Get("error_description")))
-		http.Error(w, "OAuth Error", 500)
-
+		h.handleErrorResponse(w, r)
 	case r.Method == "GET" && r.URL.Path == "/" && q.Get("code") != "":
-		h.gotCode(q.Get("code"), q.Get("state"))
-		w.Header().Add("Content-Type", "text/html")
-		if _, err := fmt.Fprintf(w, `<html><body>OK<script>window.close()</script></body></html>`); err != nil {
-			h.gotError(errors.Wrapf(err, "error while writing response body"))
-		}
-
+		h.handleCodeResponse(w, r)
 	case r.Method == "GET" && r.URL.Path == "/":
-		http.Redirect(w, r, h.authCodeURL, 302)
-
+		h.handleIndex(w, r)
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (h *authCodeFlowHandler) handleIndex(w http.ResponseWriter, r *http.Request) {
+	url := h.config.AuthCodeURL(h.state, h.authCodeOptions...)
+	http.Redirect(w, r, url, 302)
+}
+
+func (h *authCodeFlowHandler) handleCodeResponse(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	code, state := q.Get("code"), q.Get("state")
+
+	if state != h.state {
+		http.Error(w, "authorization error", 500)
+		h.gotError <- errors.Errorf("state does not match, wants %s but %s", h.state, state)
+		return
+	}
+	w.Header().Add("Content-Type", "text/html")
+	if _, err := fmt.Fprintf(w, `<html><body>OK<script>window.close()</script></body></html>`); err != nil {
+		http.Error(w, "server error", 500)
+		h.gotError <- errors.Wrapf(err, "error while writing response body")
+		return
+	}
+	h.gotCode <- code
+}
+
+func (h *authCodeFlowHandler) handleErrorResponse(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	errorCode, errorDescription := q.Get("error"), q.Get("error_description")
+
+	http.Error(w, "authorization error", 500)
+	h.gotError <- errors.Errorf("authorization error from server: %s %s", errorCode, errorDescription)
 }

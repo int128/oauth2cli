@@ -39,6 +39,7 @@ func ExampleAuthCodeFlow() {
 func TestAuthCodeFlow_GetToken(t *testing.T) {
 	// Start an auth server.
 	h := authServerHandler{
+		t:            t,
 		AuthCode:     "AUTH_CODE",
 		Scope:        "email",
 		AccessToken:  "ACCESS_TOKEN",
@@ -55,6 +56,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
 	defer cancel()
 	openBrowserCh := make(chan string)
+	defer close(openBrowserCh)
 	go func() {
 		select {
 		case url := <-openBrowserCh:
@@ -104,6 +106,7 @@ func openBrowserRequest(url string) error {
 	if err != nil {
 		return errors.Wrapf(err, "error while sending a request")
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return errors.Errorf("StatusCode wants 200 but %d", resp.StatusCode)
 	}
@@ -111,6 +114,7 @@ func openBrowserRequest(url string) error {
 }
 
 type authServerHandler struct {
+	t            *testing.T
 	Scope        string
 	AuthCode     string
 	AccessToken  string
@@ -119,8 +123,8 @@ type authServerHandler struct {
 
 func (h *authServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := h.serveHTTP(w, r); err != nil {
-		log.Printf("[authServer] Error: %s", err)
-		w.WriteHeader(500)
+		h.t.Errorf("authServerHandler error: %s", err)
+		http.Error(w, err.Error(), 500)
 	}
 }
 
@@ -128,18 +132,37 @@ func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) er
 	switch {
 	case r.Method == "GET" && r.URL.Path == "/auth":
 		q := r.URL.Query()
-		if h.Scope != q.Get("scope") {
-			return fmt.Errorf("scope wants %s but %s", h.Scope, q.Get("scope"))
+		scope, state, redirectURI := q.Get("scope"), q.Get("state"), q.Get("redirect_uri")
+
+		if scope == "" {
+			return errors.New("scope is missing")
 		}
-		to := fmt.Sprintf("%s?state=%s&code=%s", q.Get("redirect_uri"), q.Get("state"), h.AuthCode)
+		if state == "" {
+			return errors.New("state is missing")
+		}
+		if redirectURI == "" {
+			return errors.New("redirect_uri is missing")
+		}
+		if h.Scope != scope {
+			return errors.Errorf("scope wants %s but %s", h.Scope, scope)
+		}
+		to := fmt.Sprintf("%s?state=%s&code=%s", redirectURI, state, h.AuthCode)
 		http.Redirect(w, r, to, 302)
 
 	case r.Method == "POST" && r.URL.Path == "/token":
 		if err := r.ParseForm(); err != nil {
 			return errors.Wrapf(err, "error while parsing form")
 		}
-		if h.AuthCode != r.Form.Get("code") {
-			return errors.Errorf("code wants %s but %s", h.AuthCode, r.Form.Get("code"))
+		code, redirectURI := r.Form.Get("code"), r.Form.Get("redirect_uri")
+
+		if code == "" {
+			return errors.New("code is missing")
+		}
+		if redirectURI == "" {
+			return errors.New("redirect_uri is missing")
+		}
+		if h.AuthCode != code {
+			return errors.Errorf("code wants %s but %s", h.AuthCode, code)
 		}
 		w.Header().Add("Content-Type", "application/json")
 		b := fmt.Sprintf(`{
@@ -153,7 +176,7 @@ func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) er
 		}
 
 	default:
-		http.Error(w, "Not Found", 404)
+		http.NotFound(w, r)
 	}
 	return nil
 }
