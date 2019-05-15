@@ -3,7 +3,7 @@
 This is a Go package for better user experience with OAuth 2.0 or OpenID Connect (OIDC) on command line interface.
 It allows simple and easy user interaction with the Authorization Code Grant Flow using a local server.
 
-See [GoDoc](https://godoc.org/github.com/int128/oauth2cli).
+See the [example](example/) using oauth2cli.
 
 
 ## Why
