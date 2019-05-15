@@ -21,15 +21,19 @@ const AuthCodeFlowSuccessResponse = `<html><body>OK<script>window.close()</scrip
 // AuthCodeFlow provides the flow with OAuth 2.0 Authorization Code Grant.
 // See https://tools.ietf.org/html/rfc6749#section-4.1
 type AuthCodeFlow struct {
-	Config                     oauth2.Config           // OAuth2 config.
-	AuthCodeOptions            []oauth2.AuthCodeOption // OAuth2 options.
-	LocalServerPort            int                     // Local server port. Default to a random port.
-	LocalServerSuccessResponse string                  // Response body on authorization success. Default to AuthCodeFlowSuccessResponse.
-	SkipOpenBrowser            bool                    // If set, skip opening browser.
+	Config          oauth2.Config           // OAuth2 config.
+	AuthCodeOptions []oauth2.AuthCodeOption // OAuth2 options.
+	SkipOpenBrowser bool                    // If set, skip opening browser.
 
+	// Candidates of a port which the local server binds to.
+	// If multiple ports are given, it will try the ports in order.
+	// If nil or an empty slice is given, it will allocate a free port.
+	LocalServerPort []int
+	// Response HTML body on authorization success.
+	// Default to AuthCodeFlowSuccessResponse.
+	LocalServerSuccessResponse string
 	// Called when the local server is started. Default to none.
 	ShowLocalServerURL func(url string)
-
 	// Middleware for the local server. Default to none.
 	LocalServerMiddleware func(h http.Handler) http.Handler
 }
@@ -48,7 +52,7 @@ type AuthCodeFlow struct {
 func (f *AuthCodeFlow) GetToken(ctx context.Context) (*oauth2.Token, error) {
 	listener, err := newLocalhostListener(f.LocalServerPort)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while listening on port %d", f.LocalServerPort)
+		return nil, errors.Wrapf(err, "error while starting a local server")
 	}
 	defer listener.Close()
 	config := f.Config
