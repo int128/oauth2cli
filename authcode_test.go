@@ -3,6 +3,7 @@ package oauth2cli_test
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,9 +38,14 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 	go func() {
 		select {
 		case url := <-openBrowserCh:
-			if err := openBrowserRequest(url); err != nil {
+			body, err := openBrowserRequest(url)
+			if err != nil {
 				cancel()
 				t.Errorf("Could not open browser request: %+v", err)
+			}
+			t.Logf("got response body: %s", body)
+			if body != oauth2cli.AuthCodeFlowSuccessResponse {
+				t.Errorf("response body did not match")
 			}
 		case <-ctx.Done():
 			t.Errorf("Context done while waiting for opening browser: %+v", ctx.Err())
@@ -58,12 +64,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 		ShowLocalServerURL: func(url string) {
 			openBrowserCh <- url
 		},
-		LocalServerMiddleware: func(h http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				t.Logf("%s %s", r.Method, r.URL)
-				h.ServeHTTP(w, r)
-			})
-		},
+		LocalServerMiddleware: loggingMiddleware(t),
 	}
 	token, err := flow.GetToken(ctx)
 	if err != nil {
@@ -78,16 +79,29 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 	}
 }
 
-func openBrowserRequest(url string) error {
+func loggingMiddleware(t *testing.T) func(h http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Logf("oauth2cli: %s %s", r.Method, r.URL)
+			h.ServeHTTP(w, r)
+		})
+	}
+}
+
+func openBrowserRequest(url string) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return errors.Wrapf(err, "error while sending a request")
+		return "", errors.Wrapf(err, "could not send a request")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return errors.Errorf("StatusCode wants 200 but %d", resp.StatusCode)
+		return "", errors.Errorf("status wants 200 but %d", resp.StatusCode)
 	}
-	return nil
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", errors.Wrapf(err, "could not read response body")
+	}
+	return string(b), nil
 }
 
 type authServerHandler struct {
