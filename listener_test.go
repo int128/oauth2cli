@@ -57,4 +57,24 @@ func Test_newLocalhostListener(t *testing.T) {
 			t.Errorf("URL wants %s but %s", w, l.URL)
 		}
 	})
+
+	t.Run("multiplePortFail", func(t *testing.T) {
+		preListener1, err := net.Listen("tcp", "localhost:9001")
+		if err != nil {
+			t.Fatalf("Could not listen: %s", err)
+		}
+		defer preListener1.Close()
+		preListener2, err := net.Listen("tcp", "localhost:9002")
+		if err != nil {
+			t.Fatalf("Could not listen: %s", err)
+		}
+		defer preListener2.Close()
+
+		l, err := newLocalhostListener([]int{9001, 9002})
+		if err == nil {
+			l.Close()
+			t.Fatalf("newLocalhostListener wants error but nil")
+		}
+		t.Logf("expected error: %s", err)
+	})
 }

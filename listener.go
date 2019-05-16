@@ -3,6 +3,7 @@ package oauth2cli
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -19,25 +20,27 @@ func newLocalhostListener(ports []int) (*localhostListener, error) {
 	if len(ports) == 0 {
 		return newLocalhostListenerAt(0)
 	}
+	var errs []string
 	for _, port := range ports {
 		l, err := newLocalhostListenerAt(port)
 		if err != nil {
+			errs = append(errs, err.Error())
 			continue
 		}
 		return l, nil
 	}
-	return nil, errors.Errorf("could not bind any port of %v", ports)
+	return nil, errors.Errorf("no available port (%s)", strings.Join(errs, ", "))
 }
 
 func newLocalhostListenerAt(port int) (*localhostListener, error) {
 	l, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while listening on port %d", port)
+		return nil, errors.WithStack(err)
 	}
 	addr := l.Addr().String()
 	_, p, err := net.SplitHostPort(addr)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while parsing the address %s", addr)
+		return nil, errors.Wrapf(err, "could not parse the address %s", addr)
 	}
 	url := fmt.Sprintf("http://localhost:%s", p)
 	return &localhostListener{l, url}, nil
