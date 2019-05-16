@@ -17,8 +17,8 @@ func main() {
 	}
 
 	ctx := context.Background()
-	flow := oauth2cli.AuthCodeFlow{
-		Config: oauth2.Config{
+	token, err := oauth2cli.GetToken(ctx, oauth2cli.Config{
+		OAuth2Config: oauth2.Config{
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
 			Endpoint:     google.Endpoint,
@@ -27,8 +27,7 @@ func main() {
 		ShowLocalServerURL: func(url string) {
 			log.Printf("Open %s", url)
 		},
-	}
-	token, err := flow.GetToken(ctx)
+	})
 	if err != nil {
 		log.Fatalf("Could not get a token: %s", err)
 	}

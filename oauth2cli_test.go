@@ -58,7 +58,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 				if status != 200 {
 					t.Errorf("status wants 200 but %d", status)
 				}
-				if body != oauth2cli.AuthCodeFlowSuccessResponse {
+				if body != oauth2cli.DefaultLocalServerSuccessHTML {
 					t.Errorf("response body did not match")
 				}
 			case <-ctx.Done():
@@ -67,8 +67,8 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 		}()
 
 		// Start a local server and get a token.
-		flow := oauth2cli.AuthCodeFlow{
-			Config: oauth2.Config{
+		token, err := oauth2cli.GetToken(ctx, oauth2cli.Config{
+			OAuth2Config: oauth2.Config{
 				ClientID:     "YOUR_CLIENT_ID",
 				ClientSecret: "YOUR_CLIENT_SECRET",
 				Endpoint:     endpoint,
@@ -79,8 +79,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 				openBrowserCh <- url
 			},
 			LocalServerMiddleware: loggingMiddleware(t),
-		}
-		token, err := flow.GetToken(ctx)
+		})
 		if err != nil {
 			t.Errorf("Could not get a token: %+v", err)
 			return
@@ -133,8 +132,8 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 		}()
 
 		// Start a local server and get a token.
-		flow := oauth2cli.AuthCodeFlow{
-			Config: oauth2.Config{
+		_, err := oauth2cli.GetToken(ctx, oauth2cli.Config{
+			OAuth2Config: oauth2.Config{
 				ClientID:     "YOUR_CLIENT_ID",
 				ClientSecret: "YOUR_CLIENT_SECRET",
 				Endpoint:     endpoint,
@@ -145,8 +144,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 				openBrowserCh <- url
 			},
 			LocalServerMiddleware: loggingMiddleware(t),
-		}
-		_, err := flow.GetToken(ctx)
+		})
 		if err == nil {
 			t.Errorf("GetToken wants error but nil")
 		}
@@ -187,7 +185,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 				if status != 200 {
 					t.Errorf("status wants 200 but %d", status)
 				}
-				if body != oauth2cli.AuthCodeFlowSuccessResponse {
+				if body != oauth2cli.DefaultLocalServerSuccessHTML {
 					t.Errorf("response body did not match")
 				}
 			case <-ctx.Done():
@@ -196,8 +194,8 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 		}()
 
 		// Start a local server and get a token.
-		flow := oauth2cli.AuthCodeFlow{
-			Config: oauth2.Config{
+		_, err := oauth2cli.GetToken(ctx, oauth2cli.Config{
+			OAuth2Config: oauth2.Config{
 				ClientID:     "YOUR_CLIENT_ID",
 				ClientSecret: "YOUR_CLIENT_SECRET",
 				Endpoint:     endpoint,
@@ -208,8 +206,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 				openBrowserCh <- url
 			},
 			LocalServerMiddleware: loggingMiddleware(t),
-		}
-		_, err := flow.GetToken(ctx)
+		})
 		if err == nil {
 			t.Errorf("GetToken wants error but nil")
 		}
