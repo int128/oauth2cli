@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 type localhostListener struct {
@@ -29,18 +29,18 @@ func newLocalhostListener(ports []int) (*localhostListener, error) {
 		}
 		return l, nil
 	}
-	return nil, errors.Errorf("no available port (%s)", strings.Join(errs, ", "))
+	return nil, xerrors.Errorf("no available port (%s)", strings.Join(errs, ", "))
 }
 
 func newLocalhostListenerAt(port int) (*localhostListener, error) {
 	l, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, xerrors.Errorf("could not listen: %w", err)
 	}
 	addr := l.Addr().String()
 	_, p, err := net.SplitHostPort(addr)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not parse the address %s", addr)
+		return nil, xerrors.Errorf("could not parse the address %s: %w", addr, err)
 	}
 	url := fmt.Sprintf("http://localhost:%s", p)
 	return &localhostListener{l, url}, nil

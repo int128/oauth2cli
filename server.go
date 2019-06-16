@@ -9,18 +9,18 @@ import (
 	"time"
 
 	"github.com/pkg/browser"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/xerrors"
 )
 
 func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	state, err := newOAuth2State()
 	if err != nil {
-		return "", errors.Wrapf(err, "error while state parameter generation")
+		return "", xerrors.Errorf("error while state parameter generation: %w", err)
 	}
 	listener, err := newLocalhostListener(c.LocalServerPort)
 	if err != nil {
-		return "", errors.Wrapf(err, "error while starting a local server")
+		return "", xerrors.Errorf("error while starting a local server: %w", err)
 	}
 	defer listener.Close()
 	if c.OAuth2Config.RedirectURL == "" {
@@ -58,28 +58,28 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 					resp = received // pick only the first response
 				}
 				if err := server.Shutdown(ctx); err != nil {
-					return errors.Wrapf(err, "could not shutdown the local server")
+					return xerrors.Errorf("could not shutdown the local server: %w", err)
 				}
 			case <-ctx.Done():
 				if err := server.Shutdown(ctx); err != nil {
-					return errors.Wrapf(err, "could not shutdown the local server")
+					return xerrors.Errorf("could not shutdown the local server: %w", err)
 				}
-				return errors.Wrapf(ctx.Err(), "context done while waiting for authorization response")
+				return xerrors.Errorf("context done while waiting for authorization response: %w", ctx.Err())
 			}
 		}
 	})
 	eg.Go(func() error {
 		defer close(respCh)
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-			return errors.Wrapf(err, "could not start a local server")
+			return xerrors.Errorf("could not start a local server: %w", err)
 		}
 		return nil
 	})
 	if err := eg.Wait(); err != nil {
-		return "", errors.WithStack(err)
+		return "", xerrors.Errorf("error while authorization: %w", err)
 	}
 	if resp == nil {
-		return "", errors.Errorf("no authorization response")
+		return "", xerrors.New("no authorization response")
 	}
 	return resp.code, resp.err
 }
@@ -87,7 +87,7 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 func newOAuth2State() (string, error) {
 	var n uint64
 	if err := binary.Read(rand.Reader, binary.LittleEndian, &n); err != nil {
-		return "", errors.Wrapf(err, "error while reading random")
+		return "", xerrors.Errorf("error while reading random: %w", err)
 	}
 	return fmt.Sprintf("%x", n), nil
 }
@@ -128,12 +128,12 @@ func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.R
 
 	if state != h.state {
 		http.Error(w, "authorization error", 500)
-		return &authorizationResponse{err: errors.Errorf("state does not match, wants %s but %s", h.state, state)}
+		return &authorizationResponse{err: xerrors.Errorf("state does not match, wants %s but %s", h.state, state)}
 	}
 	w.Header().Add("Content-Type", "text/html")
 	if _, err := fmt.Fprintf(w, h.config.LocalServerSuccessHTML); err != nil {
 		http.Error(w, "server error", 500)
-		return &authorizationResponse{err: errors.Wrapf(err, "error while writing response body")}
+		return &authorizationResponse{err: xerrors.Errorf("error while writing response body: %w", err)}
 	}
 	return &authorizationResponse{code: code}
 }
@@ -143,5 +143,5 @@ func (h *localServerHandler) handleErrorResponse(w http.ResponseWriter, r *http.
 	errorCode, errorDescription := q.Get("error"), q.Get("error_description")
 
 	http.Error(w, "authorization error", 500)
-	return &authorizationResponse{err: errors.Errorf("authorization error from server: %s %s", errorCode, errorDescription)}
+	return &authorizationResponse{err: xerrors.Errorf("authorization error from server: %s %s", errorCode, errorDescription)}
 }

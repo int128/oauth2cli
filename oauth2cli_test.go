@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/int128/oauth2cli"
-	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
+	"golang.org/x/xerrors"
 )
 
 func TestAuthCodeFlow_GetToken(t *testing.T) {
@@ -226,12 +226,12 @@ func loggingMiddleware(t *testing.T) func(h http.Handler) http.Handler {
 func openBrowserRequest(url string) (int, string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return 0, "", errors.Wrapf(err, "could not send a request")
+		return 0, "", xerrors.Errorf("could not send a request: %w", err)
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return resp.StatusCode, "", errors.Wrapf(err, "could not read response body")
+		return resp.StatusCode, "", xerrors.Errorf("could not read response body: %w", err)
 	}
 	return resp.StatusCode, string(b), nil
 }
@@ -263,34 +263,34 @@ func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) er
 		scope, state, redirectURI := q.Get("scope"), q.Get("state"), q.Get("redirect_uri")
 
 		if scope == "" {
-			return errors.New("scope is missing")
+			return xerrors.New("scope is missing")
 		}
 		if state == "" {
-			return errors.New("state is missing")
+			return xerrors.New("state is missing")
 		}
 		if redirectURI == "" {
-			return errors.New("redirect_uri is missing")
+			return xerrors.New("redirect_uri is missing")
 		}
 		to := h.NewAuthResponse(scope, state, redirectURI)
 		http.Redirect(w, r, to, 302)
 
 	case r.Method == "POST" && r.URL.Path == "/token":
 		if err := r.ParseForm(); err != nil {
-			return errors.Wrapf(err, "error while parsing form")
+			return xerrors.Errorf("error while parsing form: %w", err)
 		}
 		code, redirectURI := r.Form.Get("code"), r.Form.Get("redirect_uri")
 
 		if code == "" {
-			return errors.New("code is missing")
+			return xerrors.New("code is missing")
 		}
 		if redirectURI == "" {
-			return errors.New("redirect_uri is missing")
+			return xerrors.New("redirect_uri is missing")
 		}
 		status, b := h.NewTokenResponse(code)
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(status)
 		if _, err := w.Write([]byte(b)); err != nil {
-			return errors.Wrapf(err, "error while writing response body")
+			return xerrors.Errorf("error while writing response body: %w", err)
 		}
 
 	default:

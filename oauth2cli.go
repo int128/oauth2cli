@@ -6,8 +6,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
+	"golang.org/x/xerrors"
 )
 
 var defaultMiddleware = func(h http.Handler) http.Handler {
@@ -58,11 +58,11 @@ func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
 	}
 	code, err := receiveCodeViaLocalServer(ctx, &config)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while receiving an authorization code")
+		return nil, xerrors.Errorf("error while receiving an authorization code: %w", err)
 	}
 	token, err := config.OAuth2Config.Exchange(ctx, code)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while exchanging authorization code and token")
+		return nil, xerrors.Errorf("error while exchanging authorization code and token: %w", err)
 	}
 	return token, nil
 }
