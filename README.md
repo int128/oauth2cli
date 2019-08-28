@@ -20,9 +20,9 @@ Typical implementation of the OAuth 2.0 Authorization Code Grant requires compli
 By using oauth2cli, user interaction becomes simple and easy as follows:
 
 1. User runs the command on a terminal.
-1. `oauth2cli` opens the browser automatically.
+1. The command opens the browser.
 1. User logs in to the provider.
-1. `oauth2cli` gets a token from the provider.
+1. The command gets a token from the provider.
 1. User can access to the API using the token.
 
 
@@ -31,7 +31,8 @@ By using oauth2cli, user interaction becomes simple and easy as follows:
 oauth2cli performs the following steps:
 
 1. Start a local server at the port.
-2. Open a browser and navigate it to the local server.
+2. Send the URL of the local server to the channel.
+   You can open a browser and navigate it to the URL.
 3. Wait for the user authorization.
 4. Receive a code via an authorization response (HTTP redirect).
 5. Exchange the code and a token.

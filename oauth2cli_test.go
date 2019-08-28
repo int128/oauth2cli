@@ -74,10 +74,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 				Endpoint:     endpoint,
 				Scopes:       []string{"email", "profile"},
 			},
-			SkipOpenBrowser: true,
-			ShowLocalServerURL: func(url string) {
-				openBrowserCh <- url
-			},
+			LocalServerReadyChan:  openBrowserCh,
 			LocalServerMiddleware: loggingMiddleware(t),
 		})
 		if err != nil {
@@ -139,10 +136,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 				Endpoint:     endpoint,
 				Scopes:       []string{"email", "profile"},
 			},
-			SkipOpenBrowser: true,
-			ShowLocalServerURL: func(url string) {
-				openBrowserCh <- url
-			},
+			LocalServerReadyChan:  openBrowserCh,
 			LocalServerMiddleware: loggingMiddleware(t),
 		})
 		if err == nil {
@@ -201,10 +195,7 @@ func TestAuthCodeFlow_GetToken(t *testing.T) {
 				Endpoint:     endpoint,
 				Scopes:       []string{"email", "profile"},
 			},
-			SkipOpenBrowser: true,
-			ShowLocalServerURL: func(url string) {
-				openBrowserCh <- url
-			},
+			LocalServerReadyChan:  openBrowserCh,
 			LocalServerMiddleware: loggingMiddleware(t),
 		})
 		if err == nil {

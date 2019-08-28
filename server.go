@@ -6,9 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net/http"
-	"time"
 
-	"github.com/pkg/browser"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 )
@@ -25,16 +23,6 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	defer listener.Close()
 	if c.OAuth2Config.RedirectURL == "" {
 		c.OAuth2Config.RedirectURL = listener.URL
-	}
-
-	if c.ShowLocalServerURL != nil {
-		c.ShowLocalServerURL(listener.URL)
-	}
-	if !c.SkipOpenBrowser {
-		go func() {
-			time.Sleep(500 * time.Millisecond)
-			_ = browser.OpenURL(listener.URL)
-		}()
 	}
 
 	respCh := make(chan *authorizationResponse)
@@ -75,6 +63,10 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		}
 		return nil
 	})
+	if c.LocalServerReadyChan != nil {
+		c.LocalServerReadyChan <- listener.URL
+	}
+
 	if err := eg.Wait(); err != nil {
 		return "", xerrors.Errorf("error while authorization: %w", err)
 	}

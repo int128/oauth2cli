@@ -17,6 +17,24 @@ func main() {
 	}
 
 	ctx := context.Background()
+
+	// open the browser on ready (this is optional)
+	ready := make(chan string)
+	defer close(ready)
+	go func() {
+		select {
+		case url, ok := <-ready:
+			if ok {
+				log.Printf("Open %s", url)
+			} else {
+				log.Printf("channel has been closed while waiting for authorization")
+			}
+		case err := <-ctx.Done():
+			log.Printf("context done while waiting for authorization: %s", err)
+		}
+	}()
+
+	// perform authorization
 	token, err := oauth2cli.GetToken(ctx, oauth2cli.Config{
 		OAuth2Config: oauth2.Config{
 			ClientID:     clientID,
@@ -24,9 +42,7 @@ func main() {
 			Endpoint:     google.Endpoint,
 			Scopes:       []string{"email"},
 		},
-		ShowLocalServerURL: func(url string) {
-			log.Printf("Open %s", url)
-		},
+		LocalServerReadyChan: ready,
 	})
 	if err != nil {
 		log.Fatalf("Could not get a token: %s", err)

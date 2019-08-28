@@ -22,8 +22,6 @@ type Config struct {
 	OAuth2Config    oauth2.Config
 	AuthCodeOptions []oauth2.AuthCodeOption
 
-	// If true, skip opening the browser.
-	SkipOpenBrowser bool
 	// Candidates of a port which the local server binds to.
 	// If multiple ports are given, it will try the ports in order.
 	// If nil or an empty slice is given, it will allocate a free port.
@@ -31,10 +29,10 @@ type Config struct {
 	// Response HTML body on authorization completed.
 	// Default to DefaultLocalServerSuccessHTML.
 	LocalServerSuccessHTML string
-	// Called when the local server is started. Default to none.
-	ShowLocalServerURL func(url string)
 	// Middleware for the local server. Default to none.
 	LocalServerMiddleware func(h http.Handler) http.Handler
+	// A channel to send its URL when the local server is ready. Default to none.
+	LocalServerReadyChan chan<- string
 }
 
 // GetToken performs Authorization Code Grant Flow and returns a token got from the provider.
