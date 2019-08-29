@@ -1,15 +1,14 @@
 # oauth2cli [![CircleCI](https://circleci.com/gh/int128/oauth2cli.svg?style=shield)](https://circleci.com/gh/int128/oauth2cli) [![GoDoc](https://godoc.org/github.com/int128/oauth2cli?status.svg)](https://godoc.org/github.com/int128/oauth2cli)
 
-This is a Go package for better user experience with OAuth 2.0 or OpenID Connect (OIDC) on command line interface (CLI).
-It allows simple and easy user interaction with the Authorization Code Grant using a local server.
+This is a Go package for authorization in a command line interface (CLI) application.
+It allows intuitive user interaction using [OAuth 2.0 Authorization Code Grant](https://tools.ietf.org/html/rfc6749#section-4.1) and the local server.
 
 See the [example](example/) for more.
 
 
 ## Why
 
-When we implement the [OAuth 2.0 Authorization Code Grant](https://tools.ietf.org/html/rfc6749#section-4.1) on CLI,
-it should be complicated user interaction.
+When we implement the OAuth 2.0 Authorization Code Grant in a CLI application, it should be complicated user interaction.
 For example,
 
 1. User runs the command on a terminal.
