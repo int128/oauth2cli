@@ -13,7 +13,7 @@ type localListener struct {
 	URL string
 }
 
-// newLocalListener starts a TCP listener on localhost.
+// newLocalListener starts a TCP listener on the given host.
 // If multiple ports are given, it will try the ports in order.
 // If nil or an empty slice is given, it will allocate a free port.
 func newLocalListener(host string, ports []int) (*localListener, error) {
