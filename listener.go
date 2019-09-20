@@ -18,7 +18,7 @@ type localListener struct {
 // If nil or an empty slice is given, it will allocate a free port.
 func newLocalListener(host string, ports []int) (*localListener, error) {
 	if len(ports) == 0 {
-		return newLocalListenerAt(host,0)
+		return newLocalListenerAt(host, 0)
 	}
 	var errs []string
 	for _, port := range ports {
@@ -39,6 +39,6 @@ func newLocalListenerAt(host string, port int) (*localListener, error) {
 	}
 	addr := l.Addr().String()
 	_, p, err := net.SplitHostPort(addr)
-	url := fmt.Sprintf("http://%s:%s", host, p)
+	url := fmt.Sprintf("http://localhost:%s", p)
 	return &localListener{l, url}, nil
 }
