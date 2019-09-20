@@ -7,9 +7,9 @@ import (
 
 func Test_newLocalhostListener(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
-		l, err := newLocalhostListener(nil)
+		l, err := newLocalListener("localhost", nil)
 		if err != nil {
-			t.Fatalf("newLocalhostListener error: %s", err)
+			t.Fatalf("newLocalListener error: %s", err)
 		}
 		defer l.Close()
 		if l.URL == "" {
@@ -19,9 +19,9 @@ func Test_newLocalhostListener(t *testing.T) {
 	})
 
 	t.Run("empty", func(t *testing.T) {
-		l, err := newLocalhostListener(nil)
+		l, err := newLocalListener("localhost", nil)
 		if err != nil {
-			t.Fatalf("newLocalhostListener error: %s", err)
+			t.Fatalf("newLocalListener error: %s", err)
 		}
 		defer l.Close()
 		if l.URL == "" {
@@ -31,9 +31,9 @@ func Test_newLocalhostListener(t *testing.T) {
 	})
 
 	t.Run("singlePort", func(t *testing.T) {
-		l, err := newLocalhostListener([]int{9000})
+		l, err := newLocalListener("localhost", []int{9000})
 		if err != nil {
-			t.Fatalf("newLocalhostListener error: %s", err)
+			t.Fatalf("newLocalListener error: %s", err)
 		}
 		defer l.Close()
 		if w := "http://localhost:9000"; l.URL != w {
@@ -48,9 +48,9 @@ func Test_newLocalhostListener(t *testing.T) {
 		}
 		defer preListener.Close()
 
-		l, err := newLocalhostListener([]int{9000, 9001})
+		l, err := newLocalListener("localhost", []int{9000, 9001})
 		if err != nil {
-			t.Fatalf("newLocalhostListener error: %s", err)
+			t.Fatalf("newLocalListener error: %s", err)
 		}
 		defer l.Close()
 		if w := "http://localhost:9001"; l.URL != w {
@@ -70,10 +70,10 @@ func Test_newLocalhostListener(t *testing.T) {
 		}
 		defer preListener2.Close()
 
-		l, err := newLocalhostListener([]int{9001, 9002})
+		l, err := newLocalListener("localhost", []int{9001, 9002})
 		if err == nil {
 			l.Close()
-			t.Fatalf("newLocalhostListener wants error but nil")
+			t.Fatalf("newLocalListener wants error but nil")
 		}
 		t.Logf("expected error: %s", err)
 	})

@@ -16,7 +16,7 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	if err != nil {
 		return "", xerrors.Errorf("error while state parameter generation: %w", err)
 	}
-	listener, err := newLocalhostListener(c.LocalServerPort)
+	listener, err := newLocalListener(c.localServerHost(), c.LocalServerPort)
 	if err != nil {
 		return "", xerrors.Errorf("error while starting a local server: %w", err)
 	}

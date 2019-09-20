@@ -26,6 +26,10 @@ type Config struct {
 	// If multiple ports are given, it will try the ports in order.
 	// If nil or an empty slice is given, it will allocate a free port.
 	LocalServerPort []int
+	// Set the hostname to listen to.
+	// If false value is given, it will listen to 'localhost' only.
+	// If true value is given, it will listen in any hostname.
+	LocalServerListenAnyHost bool
 	// Response HTML body on authorization completed.
 	// Default to DefaultLocalServerSuccessHTML.
 	LocalServerSuccessHTML string
@@ -33,6 +37,13 @@ type Config struct {
 	LocalServerMiddleware func(h http.Handler) http.Handler
 	// A channel to send its URL when the local server is ready. Default to none.
 	LocalServerReadyChan chan<- string
+}
+
+func (c *Config) localServerHost() string {
+	if c.LocalServerListenAnyHost {
+		return ""
+	}
+	return "localhost"
 }
 
 // GetToken performs Authorization Code Grant Flow and returns a token got from the provider.
