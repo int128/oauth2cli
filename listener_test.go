@@ -13,7 +13,7 @@ func Test_newLocalhostListener(t *testing.T) {
 		}
 		defer l.Close()
 		if l.URL == "" {
-			t.Errorf("URL is empty")
+			t.Errorf("URL wants a string but was empty")
 		}
 		t.Logf("URL is %s", l.URL)
 	})
@@ -25,7 +25,7 @@ func Test_newLocalhostListener(t *testing.T) {
 		}
 		defer l.Close()
 		if l.URL == "" {
-			t.Errorf("URL is empty")
+			t.Errorf("URL wants a string but was empty")
 		}
 		t.Logf("URL is %s", l.URL)
 	})
@@ -37,7 +37,7 @@ func Test_newLocalhostListener(t *testing.T) {
 		}
 		defer l.Close()
 		if w := "http://localhost:9000"; l.URL != w {
-			t.Errorf("URL wants %s but %s", w, l.URL)
+			t.Errorf("URL wants %s but was %s", w, l.URL)
 		}
 	})
 
@@ -54,7 +54,7 @@ func Test_newLocalhostListener(t *testing.T) {
 		}
 		defer l.Close()
 		if w := "http://localhost:9001"; l.URL != w {
-			t.Errorf("URL wants %s but %s", w, l.URL)
+			t.Errorf("URL wants %s but was %s", w, l.URL)
 		}
 	})
 
@@ -73,7 +73,7 @@ func Test_newLocalhostListener(t *testing.T) {
 		l, err := newLocalhostListener([]int{9001, 9002})
 		if err == nil {
 			l.Close()
-			t.Fatalf("newLocalhostListener wants error but nil")
+			t.Fatalf("newLocalhostListener wants error but was nil")
 		}
 		t.Logf("expected error: %s", err)
 	})
