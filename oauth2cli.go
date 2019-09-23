@@ -22,6 +22,10 @@ type Config struct {
 	OAuth2Config    oauth2.Config
 	AuthCodeOptions []oauth2.AuthCodeOption
 
+	// Address which the local server binds to.
+	// Set to "0.0.0.0" to bind all interfaces.
+	// Default to localhost.
+	LocalServerAddress string
 	// Candidates of a port which the local server binds to.
 	// If multiple ports are given, it will try the ports in order.
 	// If nil or an empty slice is given, it will allocate a free port.

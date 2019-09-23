@@ -14,15 +14,19 @@ type localhostListener struct {
 }
 
 // newLocalhostListener starts a TCP listener on localhost.
+//
+// If an address is given, it will bind the address. It defaults to localhost.
+// Note that this always returns a localhost URL regardless of the address.
+//
 // If multiple ports are given, it will try the ports in order.
 // If nil or an empty slice is given, it will allocate a free port.
-func newLocalhostListener(ports []int) (*localhostListener, error) {
+func newLocalhostListener(address string, ports []int) (*localhostListener, error) {
 	if len(ports) == 0 {
-		return newLocalhostListenerAt(0)
+		return newLocalhostListenerAt(address, 0)
 	}
 	var errs []string
 	for _, port := range ports {
-		l, err := newLocalhostListenerAt(port)
+		l, err := newLocalhostListenerAt(address, port)
 		if err != nil {
 			errs = append(errs, err.Error())
 			continue
@@ -32,16 +36,22 @@ func newLocalhostListener(ports []int) (*localhostListener, error) {
 	return nil, xerrors.Errorf("no available port (%s)", strings.Join(errs, ", "))
 }
 
-func newLocalhostListenerAt(port int) (*localhostListener, error) {
-	l, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+// newLocalhostListenerAt starts a TCP listener on localhost and given port.
+//
+// If an address is given, it will bind the address. It defaults to localhost.
+// Note that this always returns a localhost URL regardless of the address.
+func newLocalhostListenerAt(address string, port int) (*localhostListener, error) {
+	if address == "" {
+		address = "localhost"
+	}
+	l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
 		return nil, xerrors.Errorf("could not listen: %w", err)
 	}
-	addr := l.Addr().String()
-	_, p, err := net.SplitHostPort(addr)
-	if err != nil {
-		return nil, xerrors.Errorf("could not parse the address %s: %w", addr, err)
+	addr, ok := l.Addr().(*net.TCPAddr)
+	if !ok {
+		return nil, xerrors.Errorf("internal error: unknown type %T", l.Addr())
 	}
-	url := fmt.Sprintf("http://localhost:%s", p)
+	url := fmt.Sprintf("http://localhost:%d", addr.Port)
 	return &localhostListener{l, url}, nil
 }
