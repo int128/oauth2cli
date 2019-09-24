@@ -3,6 +3,7 @@ package oauth2cli
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 
 	"golang.org/x/xerrors"
@@ -10,7 +11,7 @@ import (
 
 type localhostListener struct {
 	net.Listener
-	URL string
+	URL url.URL
 }
 
 // newLocalhostListener starts a TCP listener on localhost.
@@ -52,6 +53,6 @@ func newLocalhostListenerAt(address string, port int) (*localhostListener, error
 	if !ok {
 		return nil, xerrors.Errorf("internal error: unknown type %T", l.Addr())
 	}
-	url := fmt.Sprintf("http://localhost:%d", addr.Port)
-	return &localhostListener{l, url}, nil
+	uri := url.URL{Host: fmt.Sprintf("localhost:%d", addr.Port), Scheme: "http"}
+	return &localhostListener{l, uri}, nil
 }
