@@ -11,7 +11,7 @@ import (
 
 type localhostListener struct {
 	net.Listener
-	URL url.URL
+	URL *url.URL // URL to the listener
 }
 
 // newLocalhostListener starts a TCP listener on localhost.
@@ -53,6 +53,8 @@ func newLocalhostListenerAt(address string, port int) (*localhostListener, error
 	if !ok {
 		return nil, xerrors.Errorf("internal error: unknown type %T", l.Addr())
 	}
-	uri := url.URL{Host: fmt.Sprintf("localhost:%d", addr.Port), Scheme: "http"}
-	return &localhostListener{l, uri}, nil
+	return &localhostListener{
+		Listener: l,
+		URL:      &url.URL{Host: fmt.Sprintf("localhost:%d", addr.Port), Scheme: "http"},
+	}, nil
 }

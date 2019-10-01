@@ -20,16 +20,15 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	if err != nil {
 		return "", xerrors.Errorf("error while starting a local server: %w", err)
 	}
-	if c.TLSConfig != nil {
-		if c.TLSConfig.CertFile == "" {
-			return "", fmt.Errorf("certificate must be set when using TLS serving")
-		}
-		if c.TLSConfig.KeyFile == "" {
-			return "", fmt.Errorf("certificate key must be set when using TLS serving")
-		}
-		listener.URL.Scheme = "https"
-	}
 	defer listener.Close()
+
+	switch {
+	case c.LocalServerCertFile == "" && c.LocalServerKeyFile == "":
+	case c.LocalServerCertFile != "" && c.LocalServerKeyFile != "":
+		listener.URL.Scheme = "https"
+	default:
+		return "", xerrors.Errorf("both LocalServerCertFile and LocalServerKeyFile must be set")
+	}
 	if c.OAuth2Config.RedirectURL == "" {
 		c.OAuth2Config.RedirectURL = listener.URL.String()
 	}
@@ -67,12 +66,14 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	})
 	eg.Go(func() error {
 		defer close(respCh)
-		if c.TLSConfig != nil {
-			if err := server.ServeTLS(listener, c.TLSConfig.CertFile, c.TLSConfig.KeyFile); err != nil && err != http.ErrServerClosed {
+		if c.LocalServerCertFile != "" && c.LocalServerKeyFile != "" {
+			if err := server.ServeTLS(listener, c.LocalServerCertFile, c.LocalServerKeyFile); err != nil && err != http.ErrServerClosed {
 				return xerrors.Errorf("could not start a local TLS server: %w", err)
 			}
-		} else if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-			return xerrors.Errorf("could not start a local server: %w", err)
+		} else {
+			if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+				return xerrors.Errorf("could not start a local server: %w", err)
+			}
 		}
 		return nil
 	})

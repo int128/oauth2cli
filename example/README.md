@@ -17,6 +17,13 @@ export GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
 export GOOGLE_CLIENT_SECRET=xxx
 ```
 
+You can set a certificate for the local server.
+
+```sh
+export LOCAL_SERVER_CERT=testdata/cert.pem
+export LOCAL_SERVER_KEY=testdata/cert-key.pem
+```
+
 Run the application:
 
 ```

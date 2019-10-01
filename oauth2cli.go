@@ -30,10 +30,14 @@ type Config struct {
 	// If multiple ports are given, it will try the ports in order.
 	// If nil or an empty slice is given, it will allocate a free port.
 	LocalServerPort []int
+	// A PEM-encoded certificate, and possibly the complete certificate chain.
 	// When set, the server will serve TLS traffic using the specified
 	// certificates. It's recommended that the public key's SANs contain
 	// the loopback addresses - 'localhost', '127.0.0.1' and '::1'
-	TLSConfig *TLSConfig
+	LocalServerCertFile string
+	// A PEM-encoded private key for the certificate.
+	// This is required when LocalServerCertFile is set.
+	LocalServerKeyFile string
 	// Response HTML body on authorization completed.
 	// Default to DefaultLocalServerSuccessHTML.
 	LocalServerSuccessHTML string
@@ -41,14 +45,6 @@ type Config struct {
 	LocalServerMiddleware func(h http.Handler) http.Handler
 	// A channel to send its URL when the local server is ready. Default to none.
 	LocalServerReadyChan chan<- string
-}
-
-// TLSConfig contains public and private keys.
-type TLSConfig struct {
-	// CertFile is a file containing a PEM-encoded certificate, and possibly the complete certificate chain
-	CertFile string
-	// KeyFile is a file containing a PEM-encoded private key for the certificate specified by CertFile
-	KeyFile string
 }
 
 // GetToken performs Authorization Code Grant Flow and returns a token got from the provider.
