@@ -23,6 +23,10 @@ export GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
 export GOOGLE_CLIENT_SECRET=xxx
 `)
 	}
+	localServerCert, localServerKey := os.Getenv("LOCAL_SERVER_CERT"), os.Getenv("LOCAL_SERVER_KEY")
+	if localServerCert != "" {
+		log.Printf("Using a TLS certificate: %s", localServerCert)
+	}
 
 	ready := make(chan string, 1)
 	var eg errgroup.Group
@@ -51,6 +55,8 @@ export GOOGLE_CLIENT_SECRET=xxx
 				Scopes:       []string{"email"},
 			},
 			LocalServerReadyChan: ready,
+			LocalServerCertFile:  localServerCert,
+			LocalServerKeyFile:   localServerKey,
 		})
 		if err != nil {
 			return xerrors.Errorf("could not get a token: %w", err)

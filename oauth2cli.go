@@ -30,6 +30,14 @@ type Config struct {
 	// If multiple ports are given, it will try the ports in order.
 	// If nil or an empty slice is given, it will allocate a free port.
 	LocalServerPort []int
+	// A PEM-encoded certificate, and possibly the complete certificate chain.
+	// When set, the server will serve TLS traffic using the specified
+	// certificates. It's recommended that the public key's SANs contain
+	// the loopback addresses - 'localhost', '127.0.0.1' and '::1'
+	LocalServerCertFile string
+	// A PEM-encoded private key for the certificate.
+	// This is required when LocalServerCertFile is set.
+	LocalServerKeyFile string
 	// Response HTML body on authorization completed.
 	// Default to DefaultLocalServerSuccessHTML.
 	LocalServerSuccessHTML string

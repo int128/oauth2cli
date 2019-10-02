@@ -2,10 +2,13 @@ package oauth2cli_test
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,212 +18,226 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func TestAuthCodeFlow_GetToken(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		// Start an auth server.
-		h := authServerHandler{
-			t: t,
-			NewAuthResponse: func(scope, state, redirectURI string) string {
-				if w := "email profile"; scope != w {
-					t.Errorf("scope wants %s but %s", w, scope)
-					return fmt.Sprintf("%s?error=invalid_scope", redirectURI)
-				}
-				return fmt.Sprintf("%s?state=%s&code=%s", redirectURI, state, "AUTH_CODE")
+func TestGetToken(t *testing.T) {
+	t.Run("NoTLS", func(t *testing.T) {
+		cfg := oauth2cli.Config{
+			OAuth2Config: oauth2.Config{
+				ClientID:     "YOUR_CLIENT_ID",
+				ClientSecret: "YOUR_CLIENT_SECRET",
+				Scopes:       []string{"email", "profile"},
 			},
-			NewTokenResponse: func(code string) (int, string) {
-				if w := "AUTH_CODE"; code != w {
-					t.Errorf("code wants %s but %s", w, code)
-					return 400, `{"error":"invalid_grant"}`
-				}
-				return 200, `{"access_token": "ACCESS_TOKEN","token_type": "Bearer","expires_in": 3600,"refresh_token": "REFRESH_TOKEN"}`
-			},
+			LocalServerMiddleware: loggingMiddleware(t),
 		}
-		s := httptest.NewServer(&h)
-		defer s.Close()
-		endpoint := oauth2.Endpoint{
-			AuthURL:  s.URL + "/auth",
-			TokenURL: s.URL + "/token",
-		}
+		t.Run("Success", func(t *testing.T) { successfulTest(t, cfg) })
+		t.Run("ErrorAuthResponse", func(t *testing.T) { errorAuthResponseTest(t, cfg) })
+		t.Run("ErrorTokenResponse", func(t *testing.T) { errorTokenResponseTest(t, cfg) })
+	})
 
-		// Wait for the local server and open a browser request.
-		ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
-		defer cancel()
-		openBrowserCh := make(chan string)
-		defer close(openBrowserCh)
-		eg, ctx := errgroup.WithContext(ctx)
-		eg.Go(func() error {
-			select {
-			case url := <-openBrowserCh:
-				status, body, err := openBrowserRequest(url)
-				if err != nil {
-					return xerrors.Errorf("could not open browser request: %w", err)
-				}
-				t.Logf("got response body: %s", body)
-				if status != 200 {
-					t.Errorf("status wants 200 but %d", status)
-				}
-				if body != oauth2cli.DefaultLocalServerSuccessHTML {
-					t.Errorf("response body did not match")
-				}
-				return nil
-			case <-ctx.Done():
-				return xerrors.Errorf("context done while waiting for opening browser: %w", ctx.Err())
+	t.Run("TLS", func(t *testing.T) {
+		cfg := oauth2cli.Config{
+			OAuth2Config: oauth2.Config{
+				ClientID:     "YOUR_CLIENT_ID",
+				ClientSecret: "YOUR_CLIENT_SECRET",
+				Scopes:       []string{"email", "profile"},
+			},
+			LocalServerCertFile:   "testdata/cert.pem",
+			LocalServerKeyFile:    "testdata/cert-key.pem",
+			LocalServerMiddleware: loggingMiddleware(t),
+		}
+		t.Run("Success", func(t *testing.T) { successfulTest(t, cfg) })
+		t.Run("ErrorAuthResponse", func(t *testing.T) { errorAuthResponseTest(t, cfg) })
+		t.Run("ErrorTokenResponse", func(t *testing.T) { errorTokenResponseTest(t, cfg) })
+	})
+}
+
+func successfulTest(t *testing.T, cfg oauth2cli.Config) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
+	defer cancel()
+	h := authServerHandler{
+		t: t,
+		NewAuthResponse: func(scope, state, redirectURI string) string {
+			if w := "email profile"; scope != w {
+				t.Errorf("scope wants %s but %s", w, scope)
+				return fmt.Sprintf("%s?error=invalid_scope", redirectURI)
 			}
-		})
-		eg.Go(func() error {
-			// Start a local server and get a token.
-			token, err := oauth2cli.GetToken(ctx, oauth2cli.Config{
-				OAuth2Config: oauth2.Config{
-					ClientID:     "YOUR_CLIENT_ID",
-					ClientSecret: "YOUR_CLIENT_SECRET",
-					Endpoint:     endpoint,
-					Scopes:       []string{"email", "profile"},
-				},
-				LocalServerReadyChan:  openBrowserCh,
-				LocalServerMiddleware: loggingMiddleware(t),
-			})
+			if cfg.LocalServerCertFile != "" && !strings.HasPrefix(redirectURI, "https://") {
+				t.Errorf("redirect_uri must start with https:// when using TLS config %s", redirectURI)
+				return fmt.Sprintf("%s?error=invalid_redirect_uri", redirectURI)
+			}
+			return fmt.Sprintf("%s?state=%s&code=%s", redirectURI, state, "AUTH_CODE")
+		},
+		NewTokenResponse: func(code string) (int, string) {
+			if w := "AUTH_CODE"; code != w {
+				t.Errorf("code wants %s but %s", w, code)
+				return 400, `{"error":"invalid_grant"}`
+			}
+			return 200, `{"access_token": "ACCESS_TOKEN","token_type": "Bearer","expires_in": 3600,"refresh_token": "REFRESH_TOKEN"}`
+		},
+	}
+	s := httptest.NewServer(&h)
+	defer s.Close()
+	openBrowserCh := make(chan string)
+	defer close(openBrowserCh)
+
+	cfg.LocalServerReadyChan = openBrowserCh
+	cfg.OAuth2Config.Endpoint = oauth2.Endpoint{
+		AuthURL:  s.URL + "/auth",
+		TokenURL: s.URL + "/token",
+	}
+
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		// Wait for the local server and open a browser request.
+		select {
+		case url := <-openBrowserCh:
+			status, body, err := openBrowserRequest(url)
 			if err != nil {
-				return xerrors.Errorf("could not get a token: %w", err)
+				return xerrors.Errorf("could not open browser request: %w", err)
 			}
-			if "ACCESS_TOKEN" != token.AccessToken {
-				t.Errorf("AccessToken wants %s but %s", "ACCESS_TOKEN", token.AccessToken)
+			t.Logf("got response body: %s", body)
+			if status != 200 {
+				t.Errorf("status wants 200 but %d", status)
 			}
-			if "REFRESH_TOKEN" != token.RefreshToken {
-				t.Errorf("RefreshToken wants %s but %s", "REFRESH_TOKEN", token.AccessToken)
+			if body != oauth2cli.DefaultLocalServerSuccessHTML {
+				t.Errorf("response body did not match")
 			}
 			return nil
-		})
-		if err := eg.Wait(); err != nil {
-			t.Errorf("error: %+v", err)
+		case <-ctx.Done():
+			return xerrors.Errorf("context done while waiting for opening browser: %w", ctx.Err())
 		}
 	})
-
-	t.Run("ErrorAuthResponse", func(t *testing.T) {
-		h := authServerHandler{
-			t: t,
-			NewAuthResponse: func(scope, state, redirectURI string) string {
-				return fmt.Sprintf("%s?error=server_error", redirectURI)
-			},
-			NewTokenResponse: func(code string) (int, string) {
-				return 500, "should not reach here"
-			},
+	eg.Go(func() error {
+		// Start a local server and get a token.
+		token, err := oauth2cli.GetToken(ctx, cfg)
+		if err != nil {
+			return xerrors.Errorf("could not get a token: %w", err)
 		}
-		s := httptest.NewServer(&h)
-		defer s.Close()
-		endpoint := oauth2.Endpoint{
-			AuthURL:  s.URL + "/auth",
-			TokenURL: s.URL + "/token",
+		if "ACCESS_TOKEN" != token.AccessToken {
+			t.Errorf("AccessToken wants %s but %s", "ACCESS_TOKEN", token.AccessToken)
 		}
+		if "REFRESH_TOKEN" != token.RefreshToken {
+			t.Errorf("RefreshToken wants %s but %s", "REFRESH_TOKEN", token.AccessToken)
+		}
+		return nil
+	})
+	if err := eg.Wait(); err != nil {
+		t.Errorf("error: %+v", err)
+	}
 
+}
+
+func errorAuthResponseTest(t *testing.T, cfg oauth2cli.Config) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
+	defer cancel()
+	h := authServerHandler{
+		t: t,
+		NewAuthResponse: func(scope, state, redirectURI string) string {
+			return fmt.Sprintf("%s?error=server_error", redirectURI)
+		},
+		NewTokenResponse: func(code string) (int, string) {
+			return 500, "should not reach here"
+		},
+	}
+	s := httptest.NewServer(&h)
+	defer s.Close()
+	openBrowserCh := make(chan string)
+	defer close(openBrowserCh)
+
+	cfg.LocalServerReadyChan = openBrowserCh
+	cfg.OAuth2Config.Endpoint = oauth2.Endpoint{
+		AuthURL:  s.URL + "/auth",
+		TokenURL: s.URL + "/token",
+	}
+
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
 		// Wait for the local server and open a browser request.
-		ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
-		defer cancel()
-		openBrowserCh := make(chan string)
-		defer close(openBrowserCh)
-		eg, ctx := errgroup.WithContext(ctx)
-		eg.Go(func() error {
-			select {
-			case url := <-openBrowserCh:
-				status, body, err := openBrowserRequest(url)
-				if err != nil {
-					return xerrors.Errorf("could not open browser request: %w", err)
-				}
-				t.Logf("got response body: %s", body)
-				if status != 500 {
-					t.Errorf("status wants 500 but %d", status)
-				}
-				return nil
-			case <-ctx.Done():
-				return xerrors.Errorf("context done while waiting for opening browser: %w", ctx.Err())
+		select {
+		case url := <-openBrowserCh:
+			status, body, err := openBrowserRequest(url)
+			if err != nil {
+				return xerrors.Errorf("could not open browser request: %w", err)
 			}
-		})
-		eg.Go(func() error {
-			// Start a local server and get a token.
-			_, err := oauth2cli.GetToken(ctx, oauth2cli.Config{
-				OAuth2Config: oauth2.Config{
-					ClientID:     "YOUR_CLIENT_ID",
-					ClientSecret: "YOUR_CLIENT_SECRET",
-					Endpoint:     endpoint,
-					Scopes:       []string{"email", "profile"},
-				},
-				LocalServerReadyChan:  openBrowserCh,
-				LocalServerMiddleware: loggingMiddleware(t),
-			})
-			if err == nil {
-				return xerrors.New("GetToken wants error but was nil")
+			t.Logf("got response body: %s", body)
+			if status != 500 {
+				t.Errorf("status wants 500 but %d", status)
 			}
-			t.Logf("expected error: %s", err)
 			return nil
-		})
-		if err := eg.Wait(); err != nil {
-			t.Errorf("error: %+v", err)
+		case <-ctx.Done():
+			return xerrors.Errorf("context done while waiting for opening browser: %w", ctx.Err())
 		}
 	})
-
-	t.Run("ErrorTokenResponse", func(t *testing.T) {
-		h := authServerHandler{
-			t: t,
-			NewAuthResponse: func(scope, state, redirectURI string) string {
-				return fmt.Sprintf("%s?state=%s&code=%s", redirectURI, state, "AUTH_CODE")
-			},
-			NewTokenResponse: func(code string) (int, string) {
-				return 400, `{"error":"invalid_request"}`
-			},
+	eg.Go(func() error {
+		// Start a local server and get a token.
+		_, err := oauth2cli.GetToken(ctx, cfg)
+		if err == nil {
+			return xerrors.New("GetToken wants error but was nil")
 		}
-		s := httptest.NewServer(&h)
-		defer s.Close()
-		endpoint := oauth2.Endpoint{
-			AuthURL:  s.URL + "/auth",
-			TokenURL: s.URL + "/token",
-		}
+		t.Logf("expected error: %s", err)
+		return nil
+	})
+	if err := eg.Wait(); err != nil {
+		t.Errorf("error: %+v", err)
+	}
+}
 
+func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
+	defer cancel()
+	h := authServerHandler{
+		t: t,
+		NewAuthResponse: func(scope, state, redirectURI string) string {
+			return fmt.Sprintf("%s?state=%s&code=%s", redirectURI, state, "AUTH_CODE")
+		},
+		NewTokenResponse: func(code string) (int, string) {
+			return 400, `{"error":"invalid_request"}`
+		},
+	}
+	s := httptest.NewServer(&h)
+	defer s.Close()
+	openBrowserCh := make(chan string)
+	defer close(openBrowserCh)
+
+	cfg.LocalServerReadyChan = openBrowserCh
+	cfg.OAuth2Config.Endpoint = oauth2.Endpoint{
+		AuthURL:  s.URL + "/auth",
+		TokenURL: s.URL + "/token",
+	}
+
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
 		// Wait for the local server and open a browser request.
-		ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
-		defer cancel()
-		openBrowserCh := make(chan string)
-		defer close(openBrowserCh)
-		eg, ctx := errgroup.WithContext(ctx)
-		eg.Go(func() error {
-			select {
-			case url := <-openBrowserCh:
-				status, body, err := openBrowserRequest(url)
-				if err != nil {
-					return xerrors.Errorf("could not open browser request: %w", err)
-				}
-				t.Logf("got response body: %s", body)
-				if status != 200 {
-					t.Errorf("status wants 200 but %d", status)
-				}
-				if body != oauth2cli.DefaultLocalServerSuccessHTML {
-					t.Errorf("response body did not match")
-				}
-				return nil
-			case <-ctx.Done():
-				return xerrors.Errorf("context done while waiting for opening browser: %w", ctx.Err())
+		select {
+		case url := <-openBrowserCh:
+			status, body, err := openBrowserRequest(url)
+			if err != nil {
+				return xerrors.Errorf("could not open browser request: %w", err)
 			}
-		})
-		eg.Go(func() error {
-			// Start a local server and get a token.
-			_, err := oauth2cli.GetToken(ctx, oauth2cli.Config{
-				OAuth2Config: oauth2.Config{
-					ClientID:     "YOUR_CLIENT_ID",
-					ClientSecret: "YOUR_CLIENT_SECRET",
-					Endpoint:     endpoint,
-					Scopes:       []string{"email", "profile"},
-				},
-				LocalServerReadyChan:  openBrowserCh,
-				LocalServerMiddleware: loggingMiddleware(t),
-			})
-			if err == nil {
-				return xerrors.New("GetToken wants error but nil")
+			t.Logf("got response body: %s", body)
+			if status != 200 {
+				t.Errorf("status wants 200 but %d", status)
 			}
-			t.Logf("expected error: %s", err)
+			if body != oauth2cli.DefaultLocalServerSuccessHTML {
+				t.Errorf("response body did not match")
+			}
 			return nil
-		})
-		if err := eg.Wait(); err != nil {
-			t.Errorf("error: %+v", err)
+		case <-ctx.Done():
+			return xerrors.Errorf("context done while waiting for opening browser: %w", ctx.Err())
 		}
 	})
+	eg.Go(func() error {
+		// Start a local server and get a token.
+		_, err := oauth2cli.GetToken(ctx, cfg)
+		if err == nil {
+			return xerrors.New("GetToken wants error but nil")
+		}
+		t.Logf("expected error: %s", err)
+		return nil
+	})
+	if err := eg.Wait(); err != nil {
+		t.Errorf("error: %+v", err)
+	}
+
 }
 
 func loggingMiddleware(t *testing.T) func(h http.Handler) http.Handler {
@@ -233,7 +250,18 @@ func loggingMiddleware(t *testing.T) func(h http.Handler) http.Handler {
 }
 
 func openBrowserRequest(url string) (int, string, error) {
-	resp, err := http.Get(url)
+	certPool := x509.NewCertPool()
+	data, err := ioutil.ReadFile("testdata/ca.pem")
+	if err != nil {
+		return 0, "", xerrors.Errorf("could not read certificate authority: %w", err)
+	}
+	if !certPool.AppendCertsFromPEM(data) {
+		return 0, "", fmt.Errorf("could not append certificate data")
+	}
+
+	// we add our custom CA, otherwise the client will throw an invalid certificate error.
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: certPool}}}
+	resp, err := client.Get(url)
 	if err != nil {
 		return 0, "", xerrors.Errorf("could not send a request: %w", err)
 	}
