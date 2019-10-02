@@ -40,14 +40,12 @@ Then set the following options:`)
 	}
 
 	ctx := context.Background()
+	eg, ctx := errgroup.WithContext(ctx)
 	ready := make(chan string, 1)
-	var eg errgroup.Group
+	defer close(ready)
 	eg.Go(func() error {
 		select {
-		case url, ok := <-ready:
-			if !ok {
-				return nil
-			}
+		case url := <-ready:
 			log.Printf("Open %s", url)
 			if err := browser.OpenURL(url); err != nil {
 				log.Printf("could not open the browser: %s", err)
@@ -58,7 +56,6 @@ Then set the following options:`)
 		}
 	})
 	eg.Go(func() error {
-		defer close(ready)
 		token, err := oauth2cli.GetToken(ctx, oauth2cli.Config{
 			OAuth2Config: oauth2.Config{
 				ClientID:     o.clientID,
