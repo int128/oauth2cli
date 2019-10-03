@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/int128/listener"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 )
@@ -16,21 +17,21 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	if err != nil {
 		return "", xerrors.Errorf("error while state parameter generation: %w", err)
 	}
-	listener, err := newLocalhostListener(c.LocalServerAddress, c.LocalServerPort)
+	l, err := listener.New(expandAddresses(c.LocalServerAddress, c.LocalServerPort))
 	if err != nil {
 		return "", xerrors.Errorf("error while starting a local server: %w", err)
 	}
-	defer listener.Close()
+	defer l.Close()
 
 	switch {
 	case c.LocalServerCertFile == "" && c.LocalServerKeyFile == "":
 	case c.LocalServerCertFile != "" && c.LocalServerKeyFile != "":
-		listener.URL.Scheme = "https"
+		l.URL.Scheme = "https"
 	default:
 		return "", xerrors.Errorf("both LocalServerCertFile and LocalServerKeyFile must be set")
 	}
 	if c.OAuth2Config.RedirectURL == "" {
-		c.OAuth2Config.RedirectURL = listener.URL.String()
+		c.OAuth2Config.RedirectURL = l.URL.String()
 	}
 
 	respCh := make(chan *authorizationResponse)
@@ -67,18 +68,18 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	eg.Go(func() error {
 		defer close(respCh)
 		if c.LocalServerCertFile != "" && c.LocalServerKeyFile != "" {
-			if err := server.ServeTLS(listener, c.LocalServerCertFile, c.LocalServerKeyFile); err != nil && err != http.ErrServerClosed {
+			if err := server.ServeTLS(l, c.LocalServerCertFile, c.LocalServerKeyFile); err != nil && err != http.ErrServerClosed {
 				return xerrors.Errorf("could not start a local TLS server: %w", err)
 			}
 		} else {
-			if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			if err := server.Serve(l); err != nil && err != http.ErrServerClosed {
 				return xerrors.Errorf("could not start a local server: %w", err)
 			}
 		}
 		return nil
 	})
 	if c.LocalServerReadyChan != nil {
-		c.LocalServerReadyChan <- listener.URL.String()
+		c.LocalServerReadyChan <- l.URL.String()
 	}
 
 	if err := eg.Wait(); err != nil {
@@ -88,6 +89,13 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		return "", xerrors.New("no authorization response")
 	}
 	return resp.code, resp.err
+}
+
+func expandAddresses(address string, ports []int) (addresses []string) {
+	for _, port := range ports {
+		addresses = append(addresses, fmt.Sprintf("%s:%d", address, port))
+	}
+	return
 }
 
 func newOAuth2State() (string, error) {

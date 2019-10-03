@@ -24,7 +24,7 @@ type Config struct {
 
 	// Address which the local server binds to.
 	// Set to "0.0.0.0" to bind all interfaces.
-	// Default to localhost.
+	// Default to "127.0.0.1".
 	LocalServerAddress string
 	// Candidates of a port which the local server binds to.
 	// If multiple ports are given, it will try the ports in order.
