@@ -36,8 +36,8 @@ func TestGetTokenImplicitly(t *testing.T) {
 		LocalServerKeyFile:    "testdata/cert-key.pem",
 		LocalServerMiddleware: loggingMiddleware(t),
 	}
+
 	t.Run("Success", func(t *testing.T) { successfulTokenImplicitTest(t, cfg) })
-	// t.Run("ErrorAuthResponse", func(t *testing.T) { errorAuthResponseTest(t, cfg) })
 }
 
 type implicitAuthServerHandler struct {
@@ -68,8 +68,7 @@ func (h *implicitAuthServerHandler) serveHTTP(w http.ResponseWriter, r *http.Req
 			return xerrors.New("redirect_uri is missing")
 		}
 		to := h.NewAuthResponse(scope, nonce, state, redirectURI)
-		http.Redirect(w, r, to, 302)
-
+		http.Redirect(w, r, to, http.StatusFound)
 	default:
 		http.NotFound(w, r)
 	}
@@ -77,7 +76,6 @@ func (h *implicitAuthServerHandler) serveHTTP(w http.ResponseWriter, r *http.Req
 }
 
 func successfulTokenImplicitTest(t *testing.T, cfg *implicit.ServerConfig) {
-
 	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Hour)
 	defer cancel()
 	h := implicitAuthServerHandler{
@@ -95,7 +93,9 @@ func successfulTokenImplicitTest(t *testing.T, cfg *implicit.ServerConfig) {
 		},
 	}
 	s := httptest.NewServer(&h)
+
 	defer s.Close()
+
 	openBrowserCh := make(chan string)
 	defer close(openBrowserCh)
 
@@ -155,7 +155,6 @@ func successfulTokenImplicitTest(t *testing.T, cfg *implicit.ServerConfig) {
 	if err := eg.Wait(); err != nil {
 		t.Errorf("error: %+v", err)
 	}
-
 }
 
 // returns a random port between 1024 and 32767
@@ -163,28 +162,7 @@ func randomPort() int {
 	return 1024 + rand.New(rand.NewSource(time.Now().UnixNano())).Intn(31744)
 }
 
-func openBrowserRequestImplicitly(ctx context.Context, url string) (int, string, error) {
-	c, err := client()
-	if err != nil {
-		return 0, "", xerrors.Errorf("could not create client: %w", err)
-	}
-	resp, err := getWithContext(ctx, c, url)
-
-	if err != nil {
-		return 0, "", xerrors.Errorf("could not send a request: %w", err)
-	}
-	l := resp.Request.Response.Header.Get("Location")
-	fmt.Printf("Location: %s", l)
-
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return resp.StatusCode, "", xerrors.Errorf("could not read response body: %w", err)
-	}
-	return resp.StatusCode, string(b), nil
-}
-
-func postFragment(ctx context.Context, postUrl string, r *http.Response) (*http.Response, error) {
+func postFragment(ctx context.Context, postURL string, r *http.Response) (*http.Response, error) {
 	c, err := client()
 	if err != nil {
 		return nil, xerrors.Errorf("could not create client: %w", err)
@@ -193,9 +171,9 @@ func postFragment(ctx context.Context, postUrl string, r *http.Response) (*http.
 	if err != nil {
 		return nil, xerrors.Errorf("could not paste location url: %w", err)
 	}
-	p, err := url.Parse(postUrl)
+	p, err := url.Parse(postURL)
 	if err != nil {
-		return nil, xerrors.Errorf("could not parse postUrl: %w", err)
+		return nil, xerrors.Errorf("could not parse postURL: %w", err)
 	}
 
 	p.RawQuery = locationURL.Fragment

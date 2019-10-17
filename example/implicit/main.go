@@ -22,6 +22,7 @@ type cmdOptions struct {
 
 func main() {
 	var o cmdOptions
+
 	flag.StringVar(&o.clientID, "client-id", "", "OAuth Client ID")
 	flag.StringVar(&o.localServerCert, "local-server-cert", "", "Path to a certificate file for the local server")
 	flag.StringVar(&o.localServerKey, "local-server-key", "", "Path to a key file for the local server")
@@ -33,6 +34,7 @@ Open https://console.cloud.google.com/apis/credentials and create a client.
 Then set the following options:`)
 		flag.PrintDefaults()
 		os.Exit(1)
+
 		return
 	}
 
@@ -40,13 +42,16 @@ Then set the following options:`)
 		log.Printf("Certificate and key are required")
 		flag.PrintDefaults()
 		os.Exit(1)
+
 		return
 	}
 
 	ctx := context.Background()
 
 	ready := make(chan string, 1)
+
 	var eg errgroup.Group
+
 	eg.Go(func() error {
 		select {
 		case url, ok := <-ready:
@@ -63,7 +68,6 @@ Then set the following options:`)
 		}
 	})
 	eg.Go(func() error {
-
 		defer close(ready)
 		token, nonce, err := oauth2cli.GeTokenIDTokenImplicitly(ctx, &implicit.ServerConfig{
 			LocalServerPort:      []int{8000},
@@ -83,6 +87,7 @@ Then set the following options:`)
 		log.Printf("You got a valid token: %+v\nnonce: %q", *token, nonce)
 		return nil
 	})
+
 	if err := eg.Wait(); err != nil {
 		log.Printf("error while authorization: %s", err)
 	}

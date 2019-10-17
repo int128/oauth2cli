@@ -43,15 +43,15 @@ type localServerHandler struct {
 // query get changed
 func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	fmt.Println(h.redirectPath)
+
 	switch {
-	case r.Method == "GET" && r.URL.Path == h.redirectPath && q.Get("error") != "":
+	case r.Method == http.MethodGet && r.URL.Path == h.redirectPath && q.Get("error") != "":
 		h.responseCh <- h.handleErrorResponse(w, r)
-	case r.Method == "POST" && r.URL.Path == h.redirectPath:
+	case r.Method == http.MethodPost && r.URL.Path == h.redirectPath:
 		h.responseCh <- h.handleTokenResponse(w, r)
-	case r.Method == "GET" && r.URL.Path == h.redirectPath:
+	case r.Method == http.MethodGet && r.URL.Path == h.redirectPath:
 		h.handleRawTokenResponse(w, r)
-	case r.Method == "GET" && r.URL.Path == "/":
+	case r.Method == http.MethodGet && r.URL.Path == "/":
 		h.handleIndex(w, r)
 	default:
 		http.NotFound(w, r)
@@ -68,15 +68,16 @@ fetch("%s?" + content,  {method: "POST"})
 </script></html>
 `
 
-func (h *localServerHandler) handleRawTokenResponse(w http.ResponseWriter, r *http.Request) {
+func (h *localServerHandler) handleRawTokenResponse(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Add("Content-Type", "text/html")
+
 	if _, err := fmt.Fprintf(w, JSPoster, h.redirectPath); err != nil {
 		http.Error(w, "server error", http.StatusInternalServerError)
 	}
 }
 func (h *localServerHandler) handleIndex(w http.ResponseWriter, r *http.Request) {
 	url := h.redirectURL()
-	http.Redirect(w, r, url, 302)
+	http.Redirect(w, r, url, http.StatusFound)
 }
 
 func (h *localServerHandler) handleTokenResponse(w http.ResponseWriter, r *http.Request) *AuthorizationResponse {
@@ -96,6 +97,7 @@ func (h *localServerHandler) handleTokenResponse(w http.ResponseWriter, r *http.
 			http.Error(w, "server error", 500)
 			return &AuthorizationResponse{err: xerrors.Errorf("access_token missing in authentication response when requesting token")}
 		}
+
 		if token.TokenType = vals.Get("token_type"); token.TokenType == "" {
 			http.Error(w, "server error", 500)
 			return &AuthorizationResponse{err: xerrors.Errorf("token_type missing in authentication response when requesting token")}
@@ -108,21 +110,26 @@ func (h *localServerHandler) handleTokenResponse(w http.ResponseWriter, r *http.
 			http.Error(w, "server error", 500)
 			return &AuthorizationResponse{err: xerrors.Errorf("id_token missing in authentication response when requesting id_token")}
 		}
+
 		vals.Set("id_token", idToken)
 	}
 
 	e := vals.Get("expires_in")
 	expires, _ := strconv.Atoi(e)
+
 	if expires != 0 {
 		token.Expiry = Now().Add(time.Duration(expires) * time.Second)
 	}
+
 	token = token.WithExtra(vals)
 
 	w.Header().Add("Content-Type", "text/html")
+
 	if _, err := fmt.Fprintf(w, h.config.LocalServerSuccessHTML); err != nil {
 		http.Error(w, "server error", 500)
 		return &AuthorizationResponse{err: xerrors.Errorf("error while writing response body: %w", err)}
 	}
+
 	return &AuthorizationResponse{token: token, nonce: h.nonce}
 }
 
@@ -131,6 +138,7 @@ func (h *localServerHandler) handleErrorResponse(w http.ResponseWriter, r *http.
 	errorCode, errorDescription := q.Get("error"), q.Get("error_description")
 
 	http.Error(w, "authorization error", 500)
+
 	return &AuthorizationResponse{err: xerrors.Errorf("authorization error from server: %s %s", errorCode, errorDescription)}
 }
 
@@ -140,6 +148,7 @@ func (h *localServerHandler) hasResponse(seek string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -163,9 +172,11 @@ func (h *localServerHandler) redirectURL() string {
 		"response_type": {strings.Join(h.responseTypes, " ")},
 		"client_id":     {c.ClientID},
 	}
+
 	if c.RedirectURL != "" {
 		v.Set("redirect_uri", c.RedirectURL)
 	}
+
 	if len(c.Scopes) > 0 {
 		v.Set("scope", strings.Join(c.Scopes, " "))
 	}
@@ -175,12 +186,15 @@ func (h *localServerHandler) redirectURL() string {
 	if h.nonce != "" {
 		v.Set("nonce", h.nonce)
 	}
+
 	if strings.Contains(c.AuthURL, "?") {
 		buf.WriteByte('&')
 	} else {
 		buf.WriteByte('?')
 	}
+
 	buf.WriteString(v.Encode())
+
 	return buf.String()
 }
 
@@ -189,19 +203,23 @@ func ReceiveTokenViaLocalServer(ctx context.Context, c *types.ServerConfig, resp
 	if err != nil {
 		return nil, "", xerrors.Errorf("error while state parameter generation: %w", err)
 	}
+
 	nonce, err = shared.NewOAuth2State()
 	if err != nil {
 		return nil, "", xerrors.Errorf("error while nonce parameter generation: %w", err)
 	}
+
 	l, err := listener.New(shared.ExpandAddresses(c.LocalServerAddress, c.LocalServerPort))
 	if err != nil {
 		return nil, "", xerrors.Errorf("error while starting a local server: %w", err)
 	}
+
 	defer l.Close()
 
 	if c.LocalServerCertFile == "" || c.LocalServerKeyFile == "" {
 		return nil, "", xerrors.Errorf("LocalServerCertFile and LocalServerKeyFile must be set when using implicit flow")
 	}
+
 	var redirectPath = "implicit"
 
 	l.URL.Scheme = "https"
@@ -236,8 +254,12 @@ func ReceiveTokenViaLocalServer(ctx context.Context, c *types.ServerConfig, resp
 			responseTypes: responseTypes,
 		}),
 	}
-	var resp *AuthorizationResponse
-	var eg errgroup.Group
+
+	var (
+		resp *AuthorizationResponse
+		eg   errgroup.Group
+	)
+
 	eg.Go(func() error {
 		for {
 			select {
@@ -280,9 +302,12 @@ func ReceiveTokenViaLocalServer(ctx context.Context, c *types.ServerConfig, resp
 	if err := eg.Wait(); err != nil {
 		return nil, "", xerrors.Errorf("error while authorization: %w", err)
 	}
+
 	if resp == nil {
 		return nil, "", xerrors.New("no authorization response")
 	}
+
 	ctx.Done()
+
 	return resp.token, resp.nonce, resp.err
 }

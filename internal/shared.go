@@ -14,6 +14,7 @@ func ExpandAddresses(address string, ports []int) (addresses []string) {
 	for _, port := range ports {
 		addresses = append(addresses, fmt.Sprintf("%s:%d", address, port))
 	}
+
 	return
 }
 
@@ -23,6 +24,7 @@ func NewOAuth2State() (string, error) {
 	if err := binary.Read(rand.Reader, binary.LittleEndian, &n); err != nil {
 		return "", xerrors.Errorf("error while reading random: %w", err)
 	}
+
 	return fmt.Sprintf("%x", n), nil
 }
 

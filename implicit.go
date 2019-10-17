@@ -3,7 +3,7 @@ package oauth2cli
 import (
 	"context"
 
-	implict_types "github.com/int128/oauth2cli/implicit"
+	implicit_types "github.com/int128/oauth2cli/implicit"
 	shared "github.com/int128/oauth2cli/internal"
 	implicit_int "github.com/int128/oauth2cli/internal/implicit"
 	"golang.org/x/oauth2"
@@ -22,17 +22,20 @@ import (
 // 	5. Post the URL fragment via JavaScript to a local endpoint.
 // 	6. Return the token.
 //
-func GetTokenImplicitly(ctx context.Context, c *implict_types.ServerConfig) (token *oauth2.Token, err error) {
+func GetTokenImplicitly(ctx context.Context, c *implicit_types.ServerConfig) (token *oauth2.Token, err error) {
 	if c.LocalServerMiddleware == nil {
 		c.LocalServerMiddleware = shared.DefaultMiddleware
 	}
+
 	if c.LocalServerSuccessHTML == "" {
 		c.LocalServerSuccessHTML = DefaultLocalServerSuccessHTML
 	}
+
 	token, _, err = implicit_int.ReceiveTokenViaLocalServer(ctx, c, []string{"token"})
 	if err != nil {
 		return token, xerrors.Errorf("error while receiving token: %w", err)
 	}
+
 	return token, err
 }
 
@@ -50,17 +53,20 @@ func GetTokenImplicitly(ctx context.Context, c *implict_types.ServerConfig) (tok
 //
 // Note: it's up to the consumer to validate the id_token with the nonce value.
 //
-func GetIDTokenImplicitly(ctx context.Context, c *implict_types.ServerConfig) (token *oauth2.Token, nonce string, err error) {
+func GetIDTokenImplicitly(ctx context.Context, c *implicit_types.ServerConfig) (token *oauth2.Token, nonce string, err error) {
 	if c.LocalServerMiddleware == nil {
 		c.LocalServerMiddleware = shared.DefaultMiddleware
 	}
+
 	if c.LocalServerSuccessHTML == "" {
 		c.LocalServerSuccessHTML = DefaultLocalServerSuccessHTML
 	}
+
 	token, nonce, err = implicit_int.ReceiveTokenViaLocalServer(ctx, c, []string{"id_token"})
 	if err != nil {
 		return token, nonce, xerrors.Errorf("error while receiving token: %w", err)
 	}
+
 	return token, nonce, err
 }
 
@@ -78,16 +84,19 @@ func GetIDTokenImplicitly(ctx context.Context, c *implict_types.ServerConfig) (t
 //
 // Note: it's up to the consumer to validate the id_token with the nonce value.
 //
-func GeTokenIDTokenImplicitly(ctx context.Context, c *implict_types.ServerConfig) (token *oauth2.Token, nonce string, err error) {
+func GeTokenIDTokenImplicitly(ctx context.Context, c *implicit_types.ServerConfig) (token *oauth2.Token, nonce string, err error) {
 	if c.LocalServerMiddleware == nil {
 		c.LocalServerMiddleware = shared.DefaultMiddleware
 	}
+
 	if c.LocalServerSuccessHTML == "" {
 		c.LocalServerSuccessHTML = DefaultLocalServerSuccessHTML
 	}
+
 	token, nonce, err = implicit_int.ReceiveTokenViaLocalServer(ctx, c, []string{"token", "id_token"})
 	if err != nil {
 		return token, nonce, xerrors.Errorf("error while receiving token: %w", err)
 	}
+
 	return token, nonce, err
 }
