@@ -2,22 +2,21 @@ package oauth2cli
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"net/http"
 
 	"github.com/int128/listener"
+	shared "github.com/int128/oauth2cli/internal"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 )
 
 func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
-	state, err := newOAuth2State()
+	state, err := shared.NewOAuth2State()
 	if err != nil {
 		return "", xerrors.Errorf("error while state parameter generation: %w", err)
 	}
-	l, err := listener.New(expandAddresses(c.LocalServerAddress, c.LocalServerPort))
+	l, err := listener.New(shared.ExpandAddresses(c.LocalServerAddress, c.LocalServerPort))
 	if err != nil {
 		return "", xerrors.Errorf("error while starting a local server: %w", err)
 	}
@@ -89,21 +88,6 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		return "", xerrors.New("no authorization response")
 	}
 	return resp.code, resp.err
-}
-
-func expandAddresses(address string, ports []int) (addresses []string) {
-	for _, port := range ports {
-		addresses = append(addresses, fmt.Sprintf("%s:%d", address, port))
-	}
-	return
-}
-
-func newOAuth2State() (string, error) {
-	var n uint64
-	if err := binary.Read(rand.Reader, binary.LittleEndian, &n); err != nil {
-		return "", xerrors.Errorf("error while reading random: %w", err)
-	}
-	return fmt.Sprintf("%x", n), nil
 }
 
 type authorizationResponse struct {

@@ -2,8 +2,6 @@ package oauth2cli_test
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -90,13 +88,13 @@ func successfulTest(t *testing.T, cfg oauth2cli.Config) {
 		// Wait for the local server and open a browser request.
 		select {
 		case url := <-openBrowserCh:
-			status, body, err := openBrowserRequest(url)
+			resp, body, err := openBrowserRequest(ctx, url)
 			if err != nil {
 				return xerrors.Errorf("could not open browser request: %w", err)
 			}
 			t.Logf("got response body: %s", body)
-			if status != 200 {
-				t.Errorf("status wants 200 but %d", status)
+			if resp.StatusCode != 200 {
+				t.Errorf("status wants 200 but %d", resp.StatusCode)
 			}
 			if body != oauth2cli.DefaultLocalServerSuccessHTML {
 				t.Errorf("response body did not match")
@@ -154,13 +152,13 @@ func errorAuthResponseTest(t *testing.T, cfg oauth2cli.Config) {
 		// Wait for the local server and open a browser request.
 		select {
 		case url := <-openBrowserCh:
-			status, body, err := openBrowserRequest(url)
+			resp, body, err := openBrowserRequest(ctx, url)
 			if err != nil {
 				return xerrors.Errorf("could not open browser request: %w", err)
 			}
 			t.Logf("got response body: %s", body)
-			if status != 500 {
-				t.Errorf("status wants 500 but %d", status)
+			if resp.StatusCode != 500 {
+				return xerrors.Errorf("status wants 500 but %d", resp.StatusCode)
 			}
 			return nil
 		case <-ctx.Done():
@@ -209,16 +207,16 @@ func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
 		// Wait for the local server and open a browser request.
 		select {
 		case url := <-openBrowserCh:
-			status, body, err := openBrowserRequest(url)
+			resp, body, err := openBrowserRequest(ctx, url)
 			if err != nil {
 				return xerrors.Errorf("could not open browser request: %w", err)
 			}
 			t.Logf("got response body: %s", body)
-			if status != 200 {
-				t.Errorf("status wants 200 but %d", status)
+			if resp.StatusCode != 200 {
+				return xerrors.Errorf("status wants 200 but %d", resp.StatusCode)
 			}
 			if body != oauth2cli.DefaultLocalServerSuccessHTML {
-				t.Errorf("response body did not match")
+				return xerrors.Errorf("response body did not match")
 			}
 			return nil
 		case <-ctx.Done():
@@ -249,28 +247,23 @@ func loggingMiddleware(t *testing.T) func(h http.Handler) http.Handler {
 	}
 }
 
-func openBrowserRequest(url string) (int, string, error) {
-	certPool := x509.NewCertPool()
-	data, err := ioutil.ReadFile("testdata/ca.pem")
+func openBrowserRequest(ctx context.Context, url string) (*http.Response, string, error) {
+	c, err := client()
 	if err != nil {
-		return 0, "", xerrors.Errorf("could not read certificate authority: %w", err)
+		return nil, "", xerrors.Errorf("could not create client: %w", err)
 	}
-	if !certPool.AppendCertsFromPEM(data) {
-		return 0, "", fmt.Errorf("could not append certificate data")
+	resp, err := getWithContext(ctx, c, url)
+
+	if err != nil {
+		return nil, "", xerrors.Errorf("could not send a request: %w", err)
 	}
 
-	// we add our custom CA, otherwise the client will throw an invalid certificate error.
-	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: certPool}}}
-	resp, err := client.Get(url)
-	if err != nil {
-		return 0, "", xerrors.Errorf("could not send a request: %w", err)
-	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return resp.StatusCode, "", xerrors.Errorf("could not read response body: %w", err)
+		return resp, "", xerrors.Errorf("could not read response body: %w", err)
 	}
-	return resp.StatusCode, string(b), nil
+	return resp, string(b), nil
 }
 
 type authServerHandler struct {
@@ -334,4 +327,12 @@ func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) er
 		http.NotFound(w, r)
 	}
 	return nil
+}
+
+func getWithContext(ctx context.Context, c *http.Client, url string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.Do(req)
 }
