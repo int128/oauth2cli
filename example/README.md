@@ -21,9 +21,23 @@ Build and run the application:
 
 It will automatically open the browser and you can log in to Google.
 
-As well as you can set a certificate and key for the local server.
+### Use a TLS certificate
+
+You can set a certificate and key for the local server.
+
+```sh
+./example -client-id xxx.apps.googleusercontent.com -client-secret xxxxxxxx \
+  -local-server-cert ../testdata/cert.pem -local-server-key ../testdata/cert-key.pem
+```
+
+### Use PKCE
+
+This example uses the Okta.
+You need to setup [your application with PKCE](https://developer.okta.com/docs/guides/implement-auth-code-pkce/overview/) on your account.
 
 ```
-% ./example -client-id xxx.apps.googleusercontent.com -client-secret xxxxxxxx \
-    -local-server-cert ../testdata/cert.pem -local-server-key ../testdata/cert-key.pem
+./example -pkce -scopes email,openid \
+  -auth-url https://xxxxxxxx.okta.com/oauth2/default/v1/authorize \
+  -token-url https://xxxxxxxx.okta.com/oauth2/default/v1/token \
+  -client-id xxxxxxxx
 ```

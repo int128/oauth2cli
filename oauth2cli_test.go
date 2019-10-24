@@ -87,6 +87,54 @@ func TestGetToken(t *testing.T) {
 		successfulTest(t, cfg, h)
 	})
 
+	t.Run("PKCE", func(t *testing.T) {
+		// https://tools.ietf.org/html/rfc7636
+		const codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+		const codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+		cfg := oauth2cli.Config{
+			OAuth2Config: oauth2.Config{
+				ClientID:     "YOUR_CLIENT_ID",
+				ClientSecret: "YOUR_CLIENT_SECRET",
+				Scopes:       []string{"email", "profile"},
+			},
+			AuthCodeOptions: []oauth2.AuthCodeOption{
+				oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+				oauth2.SetAuthURLParam("code_challenge", codeChallenge),
+			},
+			TokenRequestOptions: []oauth2.AuthCodeOption{
+				oauth2.SetAuthURLParam("code_verifier", codeVerifier),
+			},
+			LocalServerMiddleware: loggingMiddleware(t),
+		}
+		h := &authServerHandler{
+			t: t,
+			NewAuthResponse: func(r authenticationRequest) string {
+				if r.raw.Get("code_challenge_method") != "S256" {
+					t.Errorf("code_challenge_method wants S256 but was %s", r.raw.Get("code_challenge_method"))
+				}
+				if r.raw.Get("code_challenge") != codeChallenge {
+					t.Errorf("code_challenge wants %s but was %s", codeChallenge, r.raw.Get("code_challenge"))
+				}
+				if w := "email profile"; r.scope != w {
+					t.Errorf("scope wants %s but %s", w, r.scope)
+					return fmt.Sprintf("%s?error=invalid_scope", r.redirectURI)
+				}
+				return fmt.Sprintf("%s?state=%s&code=%s", r.redirectURI, r.state, "AUTH_CODE")
+			},
+			NewTokenResponse: func(r tokenRequest) (int, string) {
+				if r.raw.Get("code_verifier") != codeVerifier {
+					t.Errorf("code_verifier wants %s but was %s", codeVerifier, r.raw.Get("code_verifier"))
+				}
+				if w := "AUTH_CODE"; r.code != w {
+					t.Errorf("code wants %s but %s", w, r.code)
+					return 400, invalidGrantResponse
+				}
+				return 200, validTokenResponse
+			},
+		}
+		successfulTest(t, cfg, h)
+	})
+
 	t.Run("ErrorAuthResponse", func(t *testing.T) {
 		cfg := oauth2cli.Config{
 			OAuth2Config: oauth2.Config{
