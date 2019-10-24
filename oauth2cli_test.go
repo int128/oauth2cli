@@ -34,7 +34,7 @@ func TestGetToken(t *testing.T) {
 		}
 		h := &authServerHandler{
 			t: t,
-			NewAuthResponse: func(r authenticationRequest) string {
+			NewAuthorizationResponse: func(r authorizationRequest) string {
 				if w := "email profile"; r.scope != w {
 					t.Errorf("scope wants %s but %s", w, r.scope)
 					return fmt.Sprintf("%s?error=invalid_scope", r.redirectURI)
@@ -65,7 +65,7 @@ func TestGetToken(t *testing.T) {
 		}
 		h := &authServerHandler{
 			t: t,
-			NewAuthResponse: func(r authenticationRequest) string {
+			NewAuthorizationResponse: func(r authorizationRequest) string {
 				if w := "email profile"; r.scope != w {
 					t.Errorf("scope wants %s but %s", w, r.scope)
 					return fmt.Sprintf("%s?error=invalid_scope", r.redirectURI)
@@ -108,7 +108,7 @@ func TestGetToken(t *testing.T) {
 		}
 		h := &authServerHandler{
 			t: t,
-			NewAuthResponse: func(r authenticationRequest) string {
+			NewAuthorizationResponse: func(r authorizationRequest) string {
 				if r.raw.Get("code_challenge_method") != "S256" {
 					t.Errorf("code_challenge_method wants S256 but was %s", r.raw.Get("code_challenge_method"))
 				}
@@ -135,7 +135,7 @@ func TestGetToken(t *testing.T) {
 		successfulTest(t, cfg, h)
 	})
 
-	t.Run("ErrorAuthResponse", func(t *testing.T) {
+	t.Run("ErrorAuthorizationResponse", func(t *testing.T) {
 		cfg := oauth2cli.Config{
 			OAuth2Config: oauth2.Config{
 				ClientID:     "YOUR_CLIENT_ID",
@@ -144,7 +144,7 @@ func TestGetToken(t *testing.T) {
 			},
 			LocalServerMiddleware: loggingMiddleware(t),
 		}
-		errorAuthenticationResponseTest(t, cfg)
+		errorAuthorizationResponseTest(t, cfg)
 	})
 
 	t.Run("ErrorTokenResponse", func(t *testing.T) {
@@ -215,12 +215,12 @@ func successfulTest(t *testing.T, cfg oauth2cli.Config, h *authServerHandler) {
 
 }
 
-func errorAuthenticationResponseTest(t *testing.T, cfg oauth2cli.Config) {
+func errorAuthorizationResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
 	defer cancel()
 	h := authServerHandler{
 		t: t,
-		NewAuthResponse: func(r authenticationRequest) string {
+		NewAuthorizationResponse: func(r authorizationRequest) string {
 			return fmt.Sprintf("%s?error=server_error", r.redirectURI)
 		},
 		NewTokenResponse: func(r tokenRequest) (int, string) {
@@ -274,7 +274,7 @@ func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	defer cancel()
 	h := authServerHandler{
 		t: t,
-		NewAuthResponse: func(r authenticationRequest) string {
+		NewAuthorizationResponse: func(r authorizationRequest) string {
 			return fmt.Sprintf("%s?state=%s&code=%s", r.redirectURI, r.state, "AUTH_CODE")
 		},
 		NewTokenResponse: func(r tokenRequest) (int, string) {
@@ -359,7 +359,7 @@ func openBrowserRequest(url string) (int, string, error) {
 	return resp.StatusCode, string(b), nil
 }
 
-type authenticationRequest struct {
+type authorizationRequest struct {
 	scope       string
 	state       string
 	redirectURI string
@@ -376,7 +376,7 @@ type authServerHandler struct {
 
 	// This should return a URL with query parameters of authorization response.
 	// See https://tools.ietf.org/html/rfc6749#section-4.1.2
-	NewAuthResponse func(r authenticationRequest) string
+	NewAuthorizationResponse func(r authorizationRequest) string
 
 	// This should return a JSON body of access token response or error response.
 	// See https://tools.ietf.org/html/rfc6749#section-5.1
@@ -406,7 +406,7 @@ func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) er
 		if redirectURI == "" {
 			return xerrors.New("redirect_uri is missing")
 		}
-		to := h.NewAuthResponse(authenticationRequest{
+		to := h.NewAuthorizationResponse(authorizationRequest{
 			scope:       scope,
 			state:       state,
 			redirectURI: redirectURI,
