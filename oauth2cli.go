@@ -19,8 +19,14 @@ const DefaultLocalServerSuccessHTML = `<html><body>OK<script>window.close()</scr
 
 // Config represents a config for GetToken.
 type Config struct {
-	OAuth2Config    oauth2.Config
+	OAuth2Config oauth2.Config
+
+	// Options for an authorization request.
+	// You can set oauth2.AccessTypeOffline and the PKCE options here.
 	AuthCodeOptions []oauth2.AuthCodeOption
+	// Options for a token request.
+	// You can set the PKCE options here.
+	TokenRequestOptions []oauth2.AuthCodeOption
 
 	// Address which the local server binds to.
 	// Set to "0.0.0.0" to bind all interfaces.
@@ -70,7 +76,7 @@ func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
 	if err != nil {
 		return nil, xerrors.Errorf("error while receiving an authorization code: %w", err)
 	}
-	token, err := config.OAuth2Config.Exchange(ctx, code)
+	token, err := config.OAuth2Config.Exchange(ctx, code, config.TokenRequestOptions...)
 	if err != nil {
 		return nil, xerrors.Errorf("error while exchanging authorization code and token: %w", err)
 	}
