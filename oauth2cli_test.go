@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,9 @@ import (
 )
 
 func TestGetToken(t *testing.T) {
+	const invalidGrantResponse = `{"error":"invalid_grant"}`
+	const validTokenResponse = `{"access_token": "ACCESS_TOKEN","token_type": "Bearer","expires_in": 3600,"refresh_token": "REFRESH_TOKEN"}`
+
 	t.Run("NoTLS", func(t *testing.T) {
 		cfg := oauth2cli.Config{
 			OAuth2Config: oauth2.Config{
@@ -28,9 +32,24 @@ func TestGetToken(t *testing.T) {
 			},
 			LocalServerMiddleware: loggingMiddleware(t),
 		}
-		t.Run("Success", func(t *testing.T) { successfulTest(t, cfg) })
-		t.Run("ErrorAuthResponse", func(t *testing.T) { errorAuthResponseTest(t, cfg) })
-		t.Run("ErrorTokenResponse", func(t *testing.T) { errorTokenResponseTest(t, cfg) })
+		h := &authServerHandler{
+			t: t,
+			NewAuthResponse: func(r authenticationRequest) string {
+				if w := "email profile"; r.scope != w {
+					t.Errorf("scope wants %s but %s", w, r.scope)
+					return fmt.Sprintf("%s?error=invalid_scope", r.redirectURI)
+				}
+				return fmt.Sprintf("%s?state=%s&code=%s", r.redirectURI, r.state, "AUTH_CODE")
+			},
+			NewTokenResponse: func(r tokenRequest) (int, string) {
+				if w := "AUTH_CODE"; r.code != w {
+					t.Errorf("code wants %s but %s", w, r.code)
+					return 400, invalidGrantResponse
+				}
+				return 200, validTokenResponse
+			},
+		}
+		successfulTest(t, cfg, h)
 	})
 
 	t.Run("TLS", func(t *testing.T) {
@@ -44,37 +63,59 @@ func TestGetToken(t *testing.T) {
 			LocalServerKeyFile:    "testdata/cert-key.pem",
 			LocalServerMiddleware: loggingMiddleware(t),
 		}
-		t.Run("Success", func(t *testing.T) { successfulTest(t, cfg) })
-		t.Run("ErrorAuthResponse", func(t *testing.T) { errorAuthResponseTest(t, cfg) })
-		t.Run("ErrorTokenResponse", func(t *testing.T) { errorTokenResponseTest(t, cfg) })
+		h := &authServerHandler{
+			t: t,
+			NewAuthResponse: func(r authenticationRequest) string {
+				if w := "email profile"; r.scope != w {
+					t.Errorf("scope wants %s but %s", w, r.scope)
+					return fmt.Sprintf("%s?error=invalid_scope", r.redirectURI)
+				}
+				if !strings.HasPrefix(r.redirectURI, "https://") {
+					t.Errorf("redirect_uri must start with https:// when using TLS config %s", r.redirectURI)
+					return fmt.Sprintf("%s?error=invalid_redirect_uri", r.redirectURI)
+				}
+				return fmt.Sprintf("%s?state=%s&code=%s", r.redirectURI, r.state, "AUTH_CODE")
+			},
+			NewTokenResponse: func(r tokenRequest) (int, string) {
+				if w := "AUTH_CODE"; r.code != w {
+					t.Errorf("code wants %s but %s", w, r.code)
+					return 400, invalidGrantResponse
+				}
+				return 200, validTokenResponse
+			},
+		}
+		successfulTest(t, cfg, h)
+	})
+
+	t.Run("ErrorAuthResponse", func(t *testing.T) {
+		cfg := oauth2cli.Config{
+			OAuth2Config: oauth2.Config{
+				ClientID:     "YOUR_CLIENT_ID",
+				ClientSecret: "YOUR_CLIENT_SECRET",
+				Scopes:       []string{"email", "profile"},
+			},
+			LocalServerMiddleware: loggingMiddleware(t),
+		}
+		errorAuthenticationResponseTest(t, cfg)
+	})
+
+	t.Run("ErrorTokenResponse", func(t *testing.T) {
+		cfg := oauth2cli.Config{
+			OAuth2Config: oauth2.Config{
+				ClientID:     "YOUR_CLIENT_ID",
+				ClientSecret: "YOUR_CLIENT_SECRET",
+				Scopes:       []string{"email", "profile"},
+			},
+			LocalServerMiddleware: loggingMiddleware(t),
+		}
+		errorTokenResponseTest(t, cfg)
 	})
 }
 
-func successfulTest(t *testing.T, cfg oauth2cli.Config) {
+func successfulTest(t *testing.T, cfg oauth2cli.Config, h *authServerHandler) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
 	defer cancel()
-	h := authServerHandler{
-		t: t,
-		NewAuthResponse: func(scope, state, redirectURI string) string {
-			if w := "email profile"; scope != w {
-				t.Errorf("scope wants %s but %s", w, scope)
-				return fmt.Sprintf("%s?error=invalid_scope", redirectURI)
-			}
-			if cfg.LocalServerCertFile != "" && !strings.HasPrefix(redirectURI, "https://") {
-				t.Errorf("redirect_uri must start with https:// when using TLS config %s", redirectURI)
-				return fmt.Sprintf("%s?error=invalid_redirect_uri", redirectURI)
-			}
-			return fmt.Sprintf("%s?state=%s&code=%s", redirectURI, state, "AUTH_CODE")
-		},
-		NewTokenResponse: func(code string) (int, string) {
-			if w := "AUTH_CODE"; code != w {
-				t.Errorf("code wants %s but %s", w, code)
-				return 400, `{"error":"invalid_grant"}`
-			}
-			return 200, `{"access_token": "ACCESS_TOKEN","token_type": "Bearer","expires_in": 3600,"refresh_token": "REFRESH_TOKEN"}`
-		},
-	}
-	s := httptest.NewServer(&h)
+	s := httptest.NewServer(h)
 	defer s.Close()
 	openBrowserCh := make(chan string)
 	defer close(openBrowserCh)
@@ -89,8 +130,8 @@ func successfulTest(t *testing.T, cfg oauth2cli.Config) {
 	eg.Go(func() error {
 		// Wait for the local server and open a browser request.
 		select {
-		case url := <-openBrowserCh:
-			status, body, err := openBrowserRequest(url)
+		case to := <-openBrowserCh:
+			status, body, err := openBrowserRequest(to)
 			if err != nil {
 				return xerrors.Errorf("could not open browser request: %w", err)
 			}
@@ -126,15 +167,15 @@ func successfulTest(t *testing.T, cfg oauth2cli.Config) {
 
 }
 
-func errorAuthResponseTest(t *testing.T, cfg oauth2cli.Config) {
+func errorAuthenticationResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
 	defer cancel()
 	h := authServerHandler{
 		t: t,
-		NewAuthResponse: func(scope, state, redirectURI string) string {
-			return fmt.Sprintf("%s?error=server_error", redirectURI)
+		NewAuthResponse: func(r authenticationRequest) string {
+			return fmt.Sprintf("%s?error=server_error", r.redirectURI)
 		},
-		NewTokenResponse: func(code string) (int, string) {
+		NewTokenResponse: func(r tokenRequest) (int, string) {
 			return 500, "should not reach here"
 		},
 	}
@@ -142,7 +183,6 @@ func errorAuthResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	defer s.Close()
 	openBrowserCh := make(chan string)
 	defer close(openBrowserCh)
-
 	cfg.LocalServerReadyChan = openBrowserCh
 	cfg.OAuth2Config.Endpoint = oauth2.Endpoint{
 		AuthURL:  s.URL + "/auth",
@@ -153,8 +193,8 @@ func errorAuthResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	eg.Go(func() error {
 		// Wait for the local server and open a browser request.
 		select {
-		case url := <-openBrowserCh:
-			status, body, err := openBrowserRequest(url)
+		case to := <-openBrowserCh:
+			status, body, err := openBrowserRequest(to)
 			if err != nil {
 				return xerrors.Errorf("could not open browser request: %w", err)
 			}
@@ -186,10 +226,10 @@ func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	defer cancel()
 	h := authServerHandler{
 		t: t,
-		NewAuthResponse: func(scope, state, redirectURI string) string {
-			return fmt.Sprintf("%s?state=%s&code=%s", redirectURI, state, "AUTH_CODE")
+		NewAuthResponse: func(r authenticationRequest) string {
+			return fmt.Sprintf("%s?state=%s&code=%s", r.redirectURI, r.state, "AUTH_CODE")
 		},
-		NewTokenResponse: func(code string) (int, string) {
+		NewTokenResponse: func(r tokenRequest) (int, string) {
 			return 400, `{"error":"invalid_request"}`
 		},
 	}
@@ -197,7 +237,6 @@ func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	defer s.Close()
 	openBrowserCh := make(chan string)
 	defer close(openBrowserCh)
-
 	cfg.LocalServerReadyChan = openBrowserCh
 	cfg.OAuth2Config.Endpoint = oauth2.Endpoint{
 		AuthURL:  s.URL + "/auth",
@@ -208,8 +247,8 @@ func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	eg.Go(func() error {
 		// Wait for the local server and open a browser request.
 		select {
-		case url := <-openBrowserCh:
-			status, body, err := openBrowserRequest(url)
+		case to := <-openBrowserCh:
+			status, body, err := openBrowserRequest(to)
 			if err != nil {
 				return xerrors.Errorf("could not open browser request: %w", err)
 			}
@@ -237,7 +276,6 @@ func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	if err := eg.Wait(); err != nil {
 		t.Errorf("error: %+v", err)
 	}
-
 }
 
 func loggingMiddleware(t *testing.T) func(h http.Handler) http.Handler {
@@ -273,20 +311,33 @@ func openBrowserRequest(url string) (int, string, error) {
 	return resp.StatusCode, string(b), nil
 }
 
+type authenticationRequest struct {
+	scope       string
+	state       string
+	redirectURI string
+	raw         url.Values
+}
+
+type tokenRequest struct {
+	code string
+	raw  url.Values
+}
+
 type authServerHandler struct {
 	t *testing.T
 
 	// This should return a URL with query parameters of authorization response.
 	// See https://tools.ietf.org/html/rfc6749#section-4.1.2
-	NewAuthResponse func(scope, state, redirectURI string) string
+	NewAuthResponse func(r authenticationRequest) string
 
 	// This should return a JSON body of access token response or error response.
 	// See https://tools.ietf.org/html/rfc6749#section-5.1
 	// and https://tools.ietf.org/html/rfc6749#section-5.2
-	NewTokenResponse func(code string) (int, string)
+	NewTokenResponse func(r tokenRequest) (int, string)
 }
 
 func (h *authServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.t.Logf("authServer: %s %s", r.Method, r.RequestURI)
 	if err := h.serveHTTP(w, r); err != nil {
 		h.t.Errorf("authServerHandler error: %s", err)
 		http.Error(w, err.Error(), 500)
@@ -298,7 +349,6 @@ func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) er
 	case r.Method == "GET" && r.URL.Path == "/auth":
 		q := r.URL.Query()
 		scope, state, redirectURI := q.Get("scope"), q.Get("state"), q.Get("redirect_uri")
-
 		if scope == "" {
 			return xerrors.New("scope is missing")
 		}
@@ -308,7 +358,12 @@ func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) er
 		if redirectURI == "" {
 			return xerrors.New("redirect_uri is missing")
 		}
-		to := h.NewAuthResponse(scope, state, redirectURI)
+		to := h.NewAuthResponse(authenticationRequest{
+			scope:       scope,
+			state:       state,
+			redirectURI: redirectURI,
+			raw:         q,
+		})
 		http.Redirect(w, r, to, 302)
 
 	case r.Method == "POST" && r.URL.Path == "/token":
@@ -316,14 +371,16 @@ func (h *authServerHandler) serveHTTP(w http.ResponseWriter, r *http.Request) er
 			return xerrors.Errorf("error while parsing form: %w", err)
 		}
 		code, redirectURI := r.Form.Get("code"), r.Form.Get("redirect_uri")
-
 		if code == "" {
 			return xerrors.New("code is missing")
 		}
 		if redirectURI == "" {
 			return xerrors.New("redirect_uri is missing")
 		}
-		status, b := h.NewTokenResponse(code)
+		status, b := h.NewTokenResponse(tokenRequest{
+			code: code,
+			raw:  r.Form,
+		})
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(status)
 		if _, err := w.Write([]byte(b)); err != nil {
