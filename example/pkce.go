@@ -30,7 +30,7 @@ func configurePKCE(cfg *oauth2cli.Config) {
 func computeChallengeAndVerifier(b []byte) (string, string) {
 	verifier := base64urlencode(b)
 	s := sha256.New()
-	s.Write([]byte(verifier))
+	_, _ = s.Write([]byte(verifier))
 	challenge := base64urlencode(s.Sum(nil))
 	return challenge, verifier
 }
