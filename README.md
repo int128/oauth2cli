@@ -31,7 +31,7 @@ oauth2cli starts the local server and initiates the flow of [OAuth 2.0 Authoriza
 
 Take a look at the sequence diagram:
 
-![diagram.svg](diagram.svg)
+![diagram](docs/diagram.svg)
 
 
 ## Contributions
