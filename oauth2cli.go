@@ -4,6 +4,7 @@ package oauth2cli
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"golang.org/x/oauth2"
@@ -28,14 +29,11 @@ type Config struct {
 	// You can set the PKCE options here.
 	TokenRequestOptions []oauth2.AuthCodeOption
 
-	// Address which the local server binds to.
-	// Set to "0.0.0.0" to bind all interfaces.
-	// Default to "127.0.0.1".
-	LocalServerAddress string
-	// Candidates of a port which the local server binds to.
-	// If multiple ports are given, it will try the ports in order.
-	// If nil or an empty slice is given, it will allocate a free port.
-	LocalServerPort []int
+	// Candidates of hostname and port which the local server binds to.
+	// You can set port number to 0 to allocate a free port.
+	// If multiple addresses are given, it will try the ports in order.
+	// If nil or an empty slice is given, it defaults to "127.0.0.1:0" i.e. a free port.
+	LocalServerBindAddress []string
 	// A PEM-encoded certificate, and possibly the complete certificate chain.
 	// When set, the server will serve TLS traffic using the specified
 	// certificates. It's recommended that the public key's SANs contain
@@ -51,6 +49,24 @@ type Config struct {
 	LocalServerMiddleware func(h http.Handler) http.Handler
 	// A channel to send its URL when the local server is ready. Default to none.
 	LocalServerReadyChan chan<- string
+
+	// DEPRECATED: this will be removed in the future release.
+	// Use LocalServerBindAddress instead.
+	// Address which the local server binds to.
+	LocalServerAddress string
+	// DEPRECATED: this will be removed in the future release.
+	// Use LocalServerBindAddress instead.
+	// Candidates of a port which the local server binds to.
+	// If multiple ports are given, it will try the ports in order.
+	LocalServerPort []int
+}
+
+func (c *Config) populateDeprecatedFields() {
+	if len(c.LocalServerPort) > 0 {
+		for _, port := range c.LocalServerPort {
+			c.LocalServerBindAddress = append(c.LocalServerBindAddress, fmt.Sprintf("%s:%d", c.LocalServerAddress, port))
+		}
+	}
 }
 
 // GetToken performs Authorization Code Grant Flow and returns a token got from the provider.

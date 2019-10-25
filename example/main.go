@@ -58,10 +58,10 @@ Then set the following options:`)
 			},
 			Scopes: strings.Split(o.scopes, ","),
 		},
-		LocalServerPort:      []int{8000, 18000},
-		LocalServerReadyChan: ready,
-		LocalServerCertFile:  o.localServerCert,
-		LocalServerKeyFile:   o.localServerKey,
+		LocalServerBindAddress: []string{"127.0.0.1:8000", "127.0.0.1:18000"},
+		LocalServerReadyChan:   ready,
+		LocalServerCertFile:    o.localServerCert,
+		LocalServerKeyFile:     o.localServerKey,
 	}
 	if o.localServerCert != "" {
 		log.Printf("Using the TLS certificate: %s", o.localServerCert)
