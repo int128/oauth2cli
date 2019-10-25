@@ -3,6 +3,10 @@
 This is a Go package for OAuth 2.0 authorization in a command line interface (CLI) tool.
 You can create a CLI tool with the simple authorization flow for better UX.
 
+Take a look at the demo movie running [the example application](example/).
+
+<img alt="example" src="https://user-images.githubusercontent.com/321266/67554896-35e02280-f74b-11e9-8d32-392c13b4804a.gif" width="650" height="470">
+
 
 ## Purpose
 
@@ -21,8 +25,6 @@ You can make it simple by using oauth2cli as follows:
 1. Command opens the browser.
 1. User logs in to the server and approves the authorization.
 1. Command gets a token and access the API with the token.
-
-It is recommended to run the [example](example/) to understand the flow.
 
 
 ## How it works
