@@ -17,7 +17,8 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	if err != nil {
 		return "", xerrors.Errorf("error while state parameter generation: %w", err)
 	}
-	l, err := listener.New(expandAddresses(c.LocalServerAddress, c.LocalServerPort))
+	c.populateDeprecatedFields()
+	l, err := listener.New(c.LocalServerBindAddress)
 	if err != nil {
 		return "", xerrors.Errorf("error while starting a local server: %w", err)
 	}
@@ -89,13 +90,6 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		return "", xerrors.New("no authorization response")
 	}
 	return resp.code, resp.err
-}
-
-func expandAddresses(address string, ports []int) (addresses []string) {
-	for _, port := range ports {
-		addresses = append(addresses, fmt.Sprintf("%s:%d", address, port))
-	}
-	return
 }
 
 func newOAuth2State() (string, error) {
