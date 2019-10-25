@@ -53,18 +53,24 @@ type Config struct {
 	// DEPRECATED: this will be removed in the future release.
 	// Use LocalServerBindAddress instead.
 	// Address which the local server binds to.
+	// Default to "127.0.0.1".
 	LocalServerAddress string
 	// DEPRECATED: this will be removed in the future release.
 	// Use LocalServerBindAddress instead.
 	// Candidates of a port which the local server binds to.
-	// If multiple ports are given, it will try the ports in order.
+	// If nil or an empty slice is given, LocalServerAddress is ignored and allocate a free port.
+	// If multiple ports are given, they are appended to LocalServerBindAddress.
 	LocalServerPort []int
 }
 
 func (c *Config) populateDeprecatedFields() {
 	if len(c.LocalServerPort) > 0 {
+		address := c.LocalServerAddress
+		if address == "" {
+			address = "127.0.0.1"
+		}
 		for _, port := range c.LocalServerPort {
-			c.LocalServerBindAddress = append(c.LocalServerBindAddress, fmt.Sprintf("%s:%d", c.LocalServerAddress, port))
+			c.LocalServerBindAddress = append(c.LocalServerBindAddress, fmt.Sprintf("%s:%d", address, port))
 		}
 	}
 }

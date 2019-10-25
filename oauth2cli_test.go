@@ -16,12 +16,23 @@ func TestConfig_populateDeprecatedFields(t *testing.T) {
 		}
 	})
 
+	t.Run("AddressOnly", func(t *testing.T) {
+		cfg := Config{
+			LocalServerAddress: "0.0.0.0",
+		}
+		cfg.populateDeprecatedFields()
+		var want []string
+		if diff := cmp.Diff(want, cfg.LocalServerBindAddress); diff != "" {
+			t.Errorf("LocalServerBindAddress mismatch (-want +got):\n%s", diff)
+		}
+	})
+
 	t.Run("SinglePort", func(t *testing.T) {
 		cfg := Config{
 			LocalServerPort: []int{8000},
 		}
 		cfg.populateDeprecatedFields()
-		want := []string{":8000"}
+		want := []string{"127.0.0.1:8000"}
 		if diff := cmp.Diff(want, cfg.LocalServerBindAddress); diff != "" {
 			t.Errorf("LocalServerBindAddress mismatch (-want +got):\n%s", diff)
 		}
@@ -29,11 +40,11 @@ func TestConfig_populateDeprecatedFields(t *testing.T) {
 
 	t.Run("SinglePortWithAddress", func(t *testing.T) {
 		cfg := Config{
-			LocalServerAddress: "127.0.0.1",
+			LocalServerAddress: "0.0.0.0",
 			LocalServerPort:    []int{8000},
 		}
 		cfg.populateDeprecatedFields()
-		want := []string{"127.0.0.1:8000"}
+		want := []string{"0.0.0.0:8000"}
 		if diff := cmp.Diff(want, cfg.LocalServerBindAddress); diff != "" {
 			t.Errorf("LocalServerBindAddress mismatch (-want +got):\n%s", diff)
 		}
@@ -44,7 +55,7 @@ func TestConfig_populateDeprecatedFields(t *testing.T) {
 			LocalServerPort: []int{8000, 18000},
 		}
 		cfg.populateDeprecatedFields()
-		want := []string{":8000", ":18000"}
+		want := []string{"127.0.0.1:8000", "127.0.0.1:18000"}
 		if diff := cmp.Diff(want, cfg.LocalServerBindAddress); diff != "" {
 			t.Errorf("LocalServerBindAddress mismatch (-want +got):\n%s", diff)
 		}
@@ -52,11 +63,11 @@ func TestConfig_populateDeprecatedFields(t *testing.T) {
 
 	t.Run("MultiplePortWithAddress", func(t *testing.T) {
 		cfg := Config{
-			LocalServerAddress: "127.0.0.1",
+			LocalServerAddress: "0.0.0.0",
 			LocalServerPort:    []int{8000, 18000},
 		}
 		cfg.populateDeprecatedFields()
-		want := []string{"127.0.0.1:8000", "127.0.0.1:18000"}
+		want := []string{"0.0.0.0:8000", "0.0.0.0:18000"}
 		if diff := cmp.Diff(want, cfg.LocalServerBindAddress); diff != "" {
 			t.Errorf("LocalServerBindAddress mismatch (-want +got):\n%s", diff)
 		}
@@ -80,7 +91,7 @@ func TestConfig_populateDeprecatedFields(t *testing.T) {
 				LocalServerPort:        []int{8000},
 			}
 			cfg.populateDeprecatedFields()
-			want := []string{"127.0.0.1:10000", ":8000"}
+			want := []string{"127.0.0.1:10000", "127.0.0.1:8000"}
 			if diff := cmp.Diff(want, cfg.LocalServerBindAddress); diff != "" {
 				t.Errorf("LocalServerBindAddress mismatch (-want +got):\n%s", diff)
 			}
