@@ -1,0 +1,6 @@
+{
+  "name": "oauth2cli",
+  "description": "Library for forked kubelogin utility",
+  "owner": "DevOPS Tooling",
+  "type": "library"
+}
