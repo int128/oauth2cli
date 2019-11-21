@@ -87,20 +87,17 @@ func (c *Config) populateDeprecatedFields() {
 // 	5. Exchange the code and a token.
 // 	6. Return the code.
 //
-func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
+func GetToken(ctx context.Context, config Config) (string, error) {
 	if config.LocalServerMiddleware == nil {
 		config.LocalServerMiddleware = defaultMiddleware
 	}
 	if config.LocalServerSuccessHTML == "" {
 		config.LocalServerSuccessHTML = DefaultLocalServerSuccessHTML
 	}
-	code, err := receiveCodeViaLocalServer(ctx, &config)
+	idToken, err := receiveCodeViaLocalServer(ctx, &config)
 	if err != nil {
-		return nil, xerrors.Errorf("error while receiving an authorization code: %w", err)
+		return "", xerrors.Errorf("error while receiving an authorization code: %w", err)
 	}
-	token, err := config.OAuth2Config.Exchange(ctx, code, config.TokenRequestOptions...)
-	if err != nil {
-		return nil, xerrors.Errorf("error while exchanging authorization code and token: %w", err)
-	}
-	return token, nil
+
+	return idToken, nil
 }

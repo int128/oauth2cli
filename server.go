@@ -89,7 +89,7 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	if resp == nil {
 		return "", xerrors.New("no authorization response")
 	}
-	return resp.code, resp.err
+	return resp.idToken, resp.err
 }
 
 func newOAuth2State() (string, error) {
@@ -101,7 +101,7 @@ func newOAuth2State() (string, error) {
 }
 
 type authorizationResponse struct {
-	code string // non-empty if a valid code is received
+	idToken string // non-empty if a valid id_token is received
 	err  error  // non-nil if an error is received or any error occurs
 }
 
@@ -116,7 +116,7 @@ func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "GET" && r.URL.Path == "/" && q.Get("error") != "":
 		h.responseCh <- h.handleErrorResponse(w, r)
-	case r.Method == "GET" && r.URL.Path == "/" && q.Get("code") != "":
+	case r.Method == "POST" && r.URL.Path == "/":
 		h.responseCh <- h.handleCodeResponse(w, r)
 	case r.Method == "GET" && r.URL.Path == "/":
 		h.handleIndex(w, r)
@@ -131,8 +131,8 @@ func (h *localServerHandler) handleIndex(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.Request) *authorizationResponse {
-	q := r.URL.Query()
-	code, state := q.Get("code"), q.Get("state")
+	r.ParseForm()
+	idToken, state := r.Form.Get("id_token"), r.Form.Get("state")
 
 	if state != h.state {
 		http.Error(w, "authorization error", 500)
@@ -143,7 +143,7 @@ func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.R
 		http.Error(w, "server error", 500)
 		return &authorizationResponse{err: xerrors.Errorf("error while writing response body: %w", err)}
 	}
-	return &authorizationResponse{code: code}
+	return &authorizationResponse{idToken: idToken}
 }
 
 func (h *localServerHandler) handleErrorResponse(w http.ResponseWriter, r *http.Request) *authorizationResponse {
