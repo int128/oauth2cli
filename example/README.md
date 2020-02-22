@@ -5,7 +5,7 @@ This is an example application using oauth2cli.
 
 ## Getting Started
 
-Setup your API access:
+Setup your Google API access:
 
 1. Open https://console.cloud.google.com/apis/credentials
 1. Create an OAuth client ID where the application type is other.
@@ -27,17 +27,5 @@ You can set a certificate and key for the local server.
 
 ```sh
 ./example -client-id xxx.apps.googleusercontent.com -client-secret xxxxxxxx \
-  -local-server-cert ../testdata/cert.pem -local-server-key ../testdata/cert-key.pem
-```
-
-### Use PKCE
-
-This example uses the Okta.
-You need to setup [your application with PKCE](https://developer.okta.com/docs/guides/implement-auth-code-pkce/overview/) on your account.
-
-```
-./example -pkce -scopes email,openid \
-  -auth-url https://xxxxxxxx.okta.com/oauth2/default/v1/authorize \
-  -token-url https://xxxxxxxx.okta.com/oauth2/default/v1/token \
-  -client-id xxxxxxxx
+  -local-server-cert ../e2e_test/testdata/cert.pem -local-server-key ../e2e_test/testdata/cert-key.pem
 ```
