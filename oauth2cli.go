@@ -4,6 +4,9 @@ package oauth2cli
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"net/http"
 
@@ -21,13 +24,15 @@ type Config struct {
 	// OAuth2 config.
 	// RedirectURL will be automatically set to the local server.
 	OAuth2Config oauth2.Config
-
 	// Options for an authorization request.
 	// You can set oauth2.AccessTypeOffline and the PKCE options here.
 	AuthCodeOptions []oauth2.AuthCodeOption
 	// Options for a token request.
 	// You can set the PKCE options here.
 	TokenRequestOptions []oauth2.AuthCodeOption
+	// State parameter in the authorization request.
+	// Default to a string of random 32 bytes.
+	State string
 
 	// Candidates of hostname and port which the local server binds to.
 	// You can set port number to 0 to allocate a free port.
@@ -90,6 +95,13 @@ func (c *Config) populateDeprecatedFields() {
 // 	6. Return the code.
 //
 func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
+	if config.State == "" {
+		s, err := newOAuth2State()
+		if err != nil {
+			return nil, xerrors.Errorf("could not generate a state parameter: %w", err)
+		}
+		config.State = s
+	}
 	if config.LocalServerMiddleware == nil {
 		config.LocalServerMiddleware = noopMiddleware
 	}
@@ -106,4 +118,24 @@ func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
 		return nil, xerrors.Errorf("could not exchange the code and token: %w", err)
 	}
 	return token, nil
+}
+
+func newOAuth2State() (string, error) {
+	b, err := random32()
+	if err != nil {
+		return "", xerrors.Errorf("could not generate a random: %w", err)
+	}
+	return base64URLEncode(b), nil
+}
+
+func random32() ([]byte, error) {
+	b := make([]byte, 32)
+	if err := binary.Read(rand.Reader, binary.LittleEndian, b); err != nil {
+		return nil, xerrors.Errorf("read error: %w", err)
+	}
+	return b, nil
+}
+
+func base64URLEncode(b []byte) string {
+	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(b)
 }
