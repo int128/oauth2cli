@@ -2,8 +2,6 @@ package oauth2cli
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"net/http"
 
@@ -13,10 +11,6 @@ import (
 )
 
 func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
-	state, err := newOAuth2State()
-	if err != nil {
-		return "", xerrors.Errorf("could not generate a state parameter: %w", err)
-	}
 	l, err := listener.New(c.LocalServerBindAddress)
 	if err != nil {
 		return "", xerrors.Errorf("could not start a local server: %w", err)
@@ -38,7 +32,6 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	server := http.Server{
 		Handler: c.LocalServerMiddleware(&localServerHandler{
 			config:     c,
-			state:      state,
 			responseCh: respCh,
 		}),
 	}
@@ -91,14 +84,6 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	return resp.code, resp.err
 }
 
-func newOAuth2State() (string, error) {
-	var n uint64
-	if err := binary.Read(rand.Reader, binary.LittleEndian, &n); err != nil {
-		return "", xerrors.Errorf("read error: %w", err)
-	}
-	return fmt.Sprintf("%x", n), nil
-}
-
 type authorizationResponse struct {
 	code string // non-empty if a valid code is received
 	err  error  // non-nil if an error is received or any error occurs
@@ -106,7 +91,6 @@ type authorizationResponse struct {
 
 type localServerHandler struct {
 	config     *Config
-	state      string
 	responseCh chan<- *authorizationResponse
 }
 
@@ -125,7 +109,7 @@ func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *localServerHandler) handleIndex(w http.ResponseWriter, r *http.Request) {
-	url := h.config.OAuth2Config.AuthCodeURL(h.state, h.config.AuthCodeOptions...)
+	url := h.config.OAuth2Config.AuthCodeURL(h.config.State, h.config.AuthCodeOptions...)
 	http.Redirect(w, r, url, 302)
 }
 
@@ -133,9 +117,9 @@ func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.R
 	q := r.URL.Query()
 	code, state := q.Get("code"), q.Get("state")
 
-	if state != h.state {
+	if state != h.config.State {
 		http.Error(w, "authorization error", 500)
-		return &authorizationResponse{err: xerrors.Errorf("state does not match (wants %s but got %s)", h.state, state)}
+		return &authorizationResponse{err: xerrors.Errorf("state does not match (wants %s but got %s)", h.config.State, state)}
 	}
 	w.Header().Add("Content-Type", "text/html")
 	if _, err := fmt.Fprintf(w, h.config.LocalServerSuccessHTML); err != nil {
