@@ -11,15 +11,15 @@ import (
 	"golang.org/x/xerrors"
 )
 
-var defaultMiddleware = func(h http.Handler) http.Handler {
-	return h
-}
+var noopMiddleware = func(h http.Handler) http.Handler { return h }
 
 // DefaultLocalServerSuccessHTML is a default response body on authorization success.
 const DefaultLocalServerSuccessHTML = `<html><body>OK<script>window.close()</script></body></html>`
 
 // Config represents a config for GetToken.
 type Config struct {
+	// OAuth2 config.
+	// RedirectURL will be automatically set to the local server.
 	OAuth2Config oauth2.Config
 
 	// Options for an authorization request.
@@ -34,6 +34,7 @@ type Config struct {
 	// If multiple addresses are given, it will try the ports in order.
 	// If nil or an empty slice is given, it defaults to "127.0.0.1:0" i.e. a free port.
 	LocalServerBindAddress []string
+
 	// A PEM-encoded certificate, and possibly the complete certificate chain.
 	// When set, the server will serve TLS traffic using the specified
 	// certificates. It's recommended that the public key's SANs contain
@@ -42,6 +43,7 @@ type Config struct {
 	// A PEM-encoded private key for the certificate.
 	// This is required when LocalServerCertFile is set.
 	LocalServerKeyFile string
+
 	// Response HTML body on authorization completed.
 	// Default to DefaultLocalServerSuccessHTML.
 	LocalServerSuccessHTML string
@@ -75,10 +77,10 @@ func (c *Config) populateDeprecatedFields() {
 	}
 }
 
-// GetToken performs Authorization Code Grant Flow and returns a token got from the provider.
+// GetToken performs the Authorization Code Grant Flow and returns a token received from the provider.
 // See https://tools.ietf.org/html/rfc6749#section-4.1
 //
-// This does the following steps:
+// This performs the following steps:
 //
 //	1. Start a local server at the port.
 //	2. Open a browser and navigate it to the local server.
@@ -89,18 +91,19 @@ func (c *Config) populateDeprecatedFields() {
 //
 func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
 	if config.LocalServerMiddleware == nil {
-		config.LocalServerMiddleware = defaultMiddleware
+		config.LocalServerMiddleware = noopMiddleware
 	}
 	if config.LocalServerSuccessHTML == "" {
 		config.LocalServerSuccessHTML = DefaultLocalServerSuccessHTML
 	}
+	config.populateDeprecatedFields()
 	code, err := receiveCodeViaLocalServer(ctx, &config)
 	if err != nil {
-		return nil, xerrors.Errorf("error while receiving an authorization code: %w", err)
+		return nil, xerrors.Errorf("authorization error: %w", err)
 	}
 	token, err := config.OAuth2Config.Exchange(ctx, code, config.TokenRequestOptions...)
 	if err != nil {
-		return nil, xerrors.Errorf("error while exchanging authorization code and token: %w", err)
+		return nil, xerrors.Errorf("could not exchange the code and token: %w", err)
 	}
 	return token, nil
 }

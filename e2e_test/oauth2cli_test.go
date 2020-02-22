@@ -328,7 +328,7 @@ func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
 func loggingMiddleware(t *testing.T) func(h http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			t.Logf("oauth2cli: %s %s", r.Method, r.URL)
+			t.Logf("oauth2cli-local-server: %s %s", r.Method, r.URL)
 			h.ServeHTTP(w, r)
 		})
 	}

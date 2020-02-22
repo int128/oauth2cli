@@ -15,12 +15,11 @@ import (
 func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	state, err := newOAuth2State()
 	if err != nil {
-		return "", xerrors.Errorf("error while state parameter generation: %w", err)
+		return "", xerrors.Errorf("could not generate a state parameter: %w", err)
 	}
-	c.populateDeprecatedFields()
 	l, err := listener.New(c.LocalServerBindAddress)
 	if err != nil {
-		return "", xerrors.Errorf("error while starting a local server: %w", err)
+		return "", xerrors.Errorf("could not start a local server: %w", err)
 	}
 	defer l.Close()
 
@@ -84,7 +83,7 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	}
 
 	if err := eg.Wait(); err != nil {
-		return "", xerrors.Errorf("error while authorization: %w", err)
+		return "", xerrors.Errorf("authorization error: %w", err)
 	}
 	if resp == nil {
 		return "", xerrors.New("no authorization response")
@@ -95,7 +94,7 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 func newOAuth2State() (string, error) {
 	var n uint64
 	if err := binary.Read(rand.Reader, binary.LittleEndian, &n); err != nil {
-		return "", xerrors.Errorf("error while reading random: %w", err)
+		return "", xerrors.Errorf("read error: %w", err)
 	}
 	return fmt.Sprintf("%x", n), nil
 }
@@ -136,12 +135,12 @@ func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.R
 
 	if state != h.state {
 		http.Error(w, "authorization error", 500)
-		return &authorizationResponse{err: xerrors.Errorf("state does not match, wants %s but %s", h.state, state)}
+		return &authorizationResponse{err: xerrors.Errorf("state does not match (wants %s but got %s)", h.state, state)}
 	}
 	w.Header().Add("Content-Type", "text/html")
 	if _, err := fmt.Fprintf(w, h.config.LocalServerSuccessHTML); err != nil {
 		http.Error(w, "server error", 500)
-		return &authorizationResponse{err: xerrors.Errorf("error while writing response body: %w", err)}
+		return &authorizationResponse{err: xerrors.Errorf("write error: %w", err)}
 	}
 	return &authorizationResponse{code: code}
 }
