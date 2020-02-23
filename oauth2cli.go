@@ -4,12 +4,10 @@ package oauth2cli
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/binary"
 	"fmt"
 	"net/http"
 
+	"github.com/int128/oauth2cli/oauth2params"
 	"golang.org/x/oauth2"
 	"golang.org/x/xerrors"
 )
@@ -96,7 +94,7 @@ func (c *Config) populateDeprecatedFields() {
 //
 func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
 	if config.State == "" {
-		s, err := newOAuth2State()
+		s, err := oauth2params.NewState()
 		if err != nil {
 			return nil, xerrors.Errorf("could not generate a state parameter: %w", err)
 		}
@@ -118,24 +116,4 @@ func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
 		return nil, xerrors.Errorf("could not exchange the code and token: %w", err)
 	}
 	return token, nil
-}
-
-func newOAuth2State() (string, error) {
-	b, err := random32()
-	if err != nil {
-		return "", xerrors.Errorf("could not generate a random: %w", err)
-	}
-	return base64URLEncode(b), nil
-}
-
-func random32() ([]byte, error) {
-	b := make([]byte, 32)
-	if err := binary.Read(rand.Reader, binary.LittleEndian, b); err != nil {
-		return nil, xerrors.Errorf("read error: %w", err)
-	}
-	return b, nil
-}
-
-func base64URLEncode(b []byte) string {
-	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(b)
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/int128/oauth2cli"
+	"github.com/int128/oauth2cli/oauth2params"
 	"github.com/pkg/browser"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -51,7 +52,7 @@ Then set the following options:`)
 		log.Printf("Using the TLS certificate: %s", o.localServerCert)
 	}
 
-	codeChallenge, codeVerifier, err := generateChallengeAndVerifier()
+	pkce, err := oauth2params.NewPKCE()
 	if err != nil {
 		log.Fatalf("error: %s", err)
 	}
@@ -67,13 +68,8 @@ Then set the following options:`)
 			},
 			Scopes: strings.Split(o.scopes, ","),
 		},
-		AuthCodeOptions: []oauth2.AuthCodeOption{
-			oauth2.SetAuthURLParam("code_challenge_method", "S256"),
-			oauth2.SetAuthURLParam("code_challenge", codeChallenge),
-		},
-		TokenRequestOptions: []oauth2.AuthCodeOption{
-			oauth2.SetAuthURLParam("code_verifier", codeVerifier),
-		},
+		AuthCodeOptions:      pkce.AuthCodeOptions(),
+		TokenRequestOptions:  pkce.TokenRequestOptions(),
 		LocalServerReadyChan: ready,
 		LocalServerCertFile:  o.localServerCert,
 		LocalServerKeyFile:   o.localServerKey,
