@@ -9,7 +9,6 @@ import (
 
 	"github.com/int128/oauth2cli/oauth2params"
 	"golang.org/x/oauth2"
-	"golang.org/x/xerrors"
 )
 
 var noopMiddleware = func(h http.Handler) http.Handler { return h }
@@ -96,7 +95,7 @@ func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
 	if config.State == "" {
 		s, err := oauth2params.NewState()
 		if err != nil {
-			return nil, xerrors.Errorf("could not generate a state parameter: %w", err)
+			return nil, fmt.Errorf("could not generate a state parameter: %w", err)
 		}
 		config.State = s
 	}
@@ -109,11 +108,11 @@ func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
 	config.populateDeprecatedFields()
 	code, err := receiveCodeViaLocalServer(ctx, &config)
 	if err != nil {
-		return nil, xerrors.Errorf("authorization error: %w", err)
+		return nil, fmt.Errorf("authorization error: %w", err)
 	}
 	token, err := config.OAuth2Config.Exchange(ctx, code, config.TokenRequestOptions...)
 	if err != nil {
-		return nil, xerrors.Errorf("could not exchange the code and token: %w", err)
+		return nil, fmt.Errorf("could not exchange the code and token: %w", err)
 	}
 	return token, nil
 }

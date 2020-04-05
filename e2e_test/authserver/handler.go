@@ -4,11 +4,11 @@
 package authserver
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
-
-	"golang.org/x/xerrors"
 )
 
 // AuthorizationRequest represents an authorization request described as:
@@ -55,13 +55,13 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request) error {
 		q := r.URL.Query()
 		scope, state, redirectURI := q.Get("scope"), q.Get("state"), q.Get("redirect_uri")
 		if scope == "" {
-			return xerrors.New("scope is missing")
+			return errors.New("scope is missing")
 		}
 		if state == "" {
-			return xerrors.New("state is missing")
+			return errors.New("state is missing")
 		}
 		if redirectURI == "" {
-			return xerrors.New("redirect_uri is missing")
+			return errors.New("redirect_uri is missing")
 		}
 		to := h.NewAuthorizationResponse(AuthorizationRequest{
 			Scope:       scope,
@@ -73,14 +73,14 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request) error {
 
 	case r.Method == "POST" && r.URL.Path == "/token":
 		if err := r.ParseForm(); err != nil {
-			return xerrors.Errorf("error while parsing form: %w", err)
+			return fmt.Errorf("error while parsing form: %w", err)
 		}
 		code, redirectURI := r.Form.Get("code"), r.Form.Get("redirect_uri")
 		if code == "" {
-			return xerrors.New("code is missing")
+			return errors.New("code is missing")
 		}
 		if redirectURI == "" {
-			return xerrors.New("redirect_uri is missing")
+			return errors.New("redirect_uri is missing")
 		}
 		status, b := h.NewTokenResponse(TokenRequest{
 			Code: code,
@@ -89,7 +89,7 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(status)
 		if _, err := w.Write([]byte(b)); err != nil {
-			return xerrors.Errorf("error while writing response body: %w", err)
+			return fmt.Errorf("error while writing response body: %w", err)
 		}
 
 	default:

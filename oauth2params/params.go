@@ -6,9 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"fmt"
 
 	"golang.org/x/oauth2"
-	"golang.org/x/xerrors"
 )
 
 // NewState returns a state parameter.
@@ -16,7 +16,7 @@ import (
 func NewState() (string, error) {
 	b, err := random(32)
 	if err != nil {
-		return "", xerrors.Errorf("could not generate a random: %w", err)
+		return "", fmt.Errorf("could not generate a random: %w", err)
 	}
 	return base64URLEncode(b), nil
 }
@@ -49,7 +49,7 @@ func (pkce *PKCE) TokenRequestOptions() []oauth2.AuthCodeOption {
 func NewPKCE() (*PKCE, error) {
 	b, err := random(32)
 	if err != nil {
-		return nil, xerrors.Errorf("could not generate a random: %w", err)
+		return nil, fmt.Errorf("could not generate a random: %w", err)
 	}
 	s := computeS256(b)
 	return &s, nil
@@ -69,7 +69,7 @@ func computeS256(b []byte) PKCE {
 func random(bits int) ([]byte, error) {
 	b := make([]byte, bits)
 	if err := binary.Read(rand.Reader, binary.LittleEndian, b); err != nil {
-		return nil, xerrors.Errorf("read error: %w", err)
+		return nil, fmt.Errorf("read error: %w", err)
 	}
 	return b, nil
 }

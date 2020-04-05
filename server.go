@@ -2,18 +2,18 @@ package oauth2cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/int128/listener"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 )
 
 func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	l, err := listener.New(c.LocalServerBindAddress)
 	if err != nil {
-		return "", xerrors.Errorf("could not start a local server: %w", err)
+		return "", fmt.Errorf("could not start a local server: %w", err)
 	}
 	defer l.Close()
 
@@ -22,7 +22,7 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	case c.LocalServerCertFile != "" && c.LocalServerKeyFile != "":
 		l.URL.Scheme = "https"
 	default:
-		return "", xerrors.Errorf("both LocalServerCertFile and LocalServerKeyFile must be set")
+		return "", fmt.Errorf("both LocalServerCertFile and LocalServerKeyFile must be set")
 	}
 	if c.OAuth2Config.RedirectURL == "" {
 		c.OAuth2Config.RedirectURL = l.URL.String()
@@ -48,13 +48,13 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 					resp = received // pick only the first response
 				}
 				if err := server.Shutdown(ctx); err != nil {
-					return xerrors.Errorf("could not shutdown the local server: %w", err)
+					return fmt.Errorf("could not shutdown the local server: %w", err)
 				}
 			case <-ctx.Done():
 				if err := server.Shutdown(ctx); err != nil {
-					return xerrors.Errorf("could not shutdown the local server: %w", err)
+					return fmt.Errorf("could not shutdown the local server: %w", err)
 				}
-				return xerrors.Errorf("context done while waiting for authorization response: %w", ctx.Err())
+				return fmt.Errorf("context done while waiting for authorization response: %w", ctx.Err())
 			}
 		}
 	})
@@ -62,11 +62,11 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		defer close(respCh)
 		if c.LocalServerCertFile != "" && c.LocalServerKeyFile != "" {
 			if err := server.ServeTLS(l, c.LocalServerCertFile, c.LocalServerKeyFile); err != nil && err != http.ErrServerClosed {
-				return xerrors.Errorf("could not start a local TLS server: %w", err)
+				return fmt.Errorf("could not start a local TLS server: %w", err)
 			}
 		} else {
 			if err := server.Serve(l); err != nil && err != http.ErrServerClosed {
-				return xerrors.Errorf("could not start a local server: %w", err)
+				return fmt.Errorf("could not start a local server: %w", err)
 			}
 		}
 		return nil
@@ -76,10 +76,10 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	}
 
 	if err := eg.Wait(); err != nil {
-		return "", xerrors.Errorf("authorization error: %w", err)
+		return "", fmt.Errorf("authorization error: %w", err)
 	}
 	if resp == nil {
-		return "", xerrors.New("no authorization response")
+		return "", errors.New("no authorization response")
 	}
 	return resp.code, resp.err
 }
@@ -119,12 +119,12 @@ func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.R
 
 	if state != h.config.State {
 		http.Error(w, "authorization error", 500)
-		return &authorizationResponse{err: xerrors.Errorf("state does not match (wants %s but got %s)", h.config.State, state)}
+		return &authorizationResponse{err: fmt.Errorf("state does not match (wants %s but got %s)", h.config.State, state)}
 	}
 	w.Header().Add("Content-Type", "text/html")
 	if _, err := fmt.Fprintf(w, h.config.LocalServerSuccessHTML); err != nil {
 		http.Error(w, "server error", 500)
-		return &authorizationResponse{err: xerrors.Errorf("write error: %w", err)}
+		return &authorizationResponse{err: fmt.Errorf("write error: %w", err)}
 	}
 	return &authorizationResponse{code: code}
 }
@@ -134,5 +134,5 @@ func (h *localServerHandler) handleErrorResponse(w http.ResponseWriter, r *http.
 	errorCode, errorDescription := q.Get("error"), q.Get("error_description")
 
 	http.Error(w, "authorization error", 500)
-	return &authorizationResponse{err: xerrors.Errorf("authorization error from server: %s %s", errorCode, errorDescription)}
+	return &authorizationResponse{err: fmt.Errorf("authorization error from server: %s %s", errorCode, errorDescription)}
 }
