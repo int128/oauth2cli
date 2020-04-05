@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 )
 
 func init() {
@@ -85,14 +85,14 @@ Then set the following options:`)
 				log.Printf("could not open the browser: %s", err)
 			}
 			return nil
-		case err := <-ctx.Done():
-			return xerrors.Errorf("context done while waiting for authorization: %w", err)
+		case <-ctx.Done():
+			return fmt.Errorf("context done while waiting for authorization: %w", ctx.Err())
 		}
 	})
 	eg.Go(func() error {
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {
-			return xerrors.Errorf("could not get a token: %w", err)
+			return fmt.Errorf("could not get a token: %w", err)
 		}
 		log.Printf("You got a valid token until %s", token.Expiry)
 		return nil

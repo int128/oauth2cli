@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 	"github.com/int128/oauth2cli/e2e_test/authserver"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 )
 
 func TestGetToken(t *testing.T) {
@@ -181,7 +181,7 @@ func successfulTest(t *testing.T, cfg oauth2cli.Config, h *authserver.Handler) {
 		case to := <-openBrowserCh:
 			status, body, err := openBrowserRequest(to)
 			if err != nil {
-				return xerrors.Errorf("could not open browser request: %w", err)
+				return fmt.Errorf("could not open browser request: %w", err)
 			}
 			t.Logf("got response body: %s", body)
 			if status != 200 {
@@ -192,14 +192,14 @@ func successfulTest(t *testing.T, cfg oauth2cli.Config, h *authserver.Handler) {
 			}
 			return nil
 		case <-ctx.Done():
-			return xerrors.Errorf("context done while waiting for opening browser: %w", ctx.Err())
+			return fmt.Errorf("context done while waiting for opening browser: %w", ctx.Err())
 		}
 	})
 	eg.Go(func() error {
 		// Start a local server and get a token.
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {
-			return xerrors.Errorf("could not get a token: %w", err)
+			return fmt.Errorf("could not get a token: %w", err)
 		}
 		if "ACCESS_TOKEN" != token.AccessToken {
 			t.Errorf("AccessToken wants %s but %s", "ACCESS_TOKEN", token.AccessToken)
@@ -243,7 +243,7 @@ func errorAuthorizationResponseTest(t *testing.T, cfg oauth2cli.Config) {
 		case to := <-openBrowserCh:
 			status, body, err := openBrowserRequest(to)
 			if err != nil {
-				return xerrors.Errorf("could not open browser request: %w", err)
+				return fmt.Errorf("could not open browser request: %w", err)
 			}
 			t.Logf("got response body: %s", body)
 			if status != 500 {
@@ -251,14 +251,14 @@ func errorAuthorizationResponseTest(t *testing.T, cfg oauth2cli.Config) {
 			}
 			return nil
 		case <-ctx.Done():
-			return xerrors.Errorf("context done while waiting for opening browser: %w", ctx.Err())
+			return fmt.Errorf("context done while waiting for opening browser: %w", ctx.Err())
 		}
 	})
 	eg.Go(func() error {
 		// Start a local server and get a token.
 		_, err := oauth2cli.GetToken(ctx, cfg)
 		if err == nil {
-			return xerrors.New("GetToken wants error but was nil")
+			return errors.New("GetToken wants error but was nil")
 		}
 		t.Logf("expected error: %s", err)
 		return nil
@@ -297,7 +297,7 @@ func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
 		case to := <-openBrowserCh:
 			status, body, err := openBrowserRequest(to)
 			if err != nil {
-				return xerrors.Errorf("could not open browser request: %w", err)
+				return fmt.Errorf("could not open browser request: %w", err)
 			}
 			t.Logf("got response body: %s", body)
 			if status != 200 {
@@ -308,14 +308,14 @@ func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
 			}
 			return nil
 		case <-ctx.Done():
-			return xerrors.Errorf("context done while waiting for opening browser: %w", ctx.Err())
+			return fmt.Errorf("context done while waiting for opening browser: %w", ctx.Err())
 		}
 	})
 	eg.Go(func() error {
 		// Start a local server and get a token.
 		_, err := oauth2cli.GetToken(ctx, cfg)
 		if err == nil {
-			return xerrors.New("GetToken wants error but nil")
+			return errors.New("GetToken wants error but nil")
 		}
 		t.Logf("expected error: %s", err)
 		return nil
@@ -338,7 +338,7 @@ func openBrowserRequest(url string) (int, string, error) {
 	certPool := x509.NewCertPool()
 	data, err := ioutil.ReadFile("testdata/ca.pem")
 	if err != nil {
-		return 0, "", xerrors.Errorf("could not read certificate authority: %w", err)
+		return 0, "", fmt.Errorf("could not read certificate authority: %w", err)
 	}
 	if !certPool.AppendCertsFromPEM(data) {
 		return 0, "", fmt.Errorf("could not append certificate data")
@@ -348,12 +348,12 @@ func openBrowserRequest(url string) (int, string, error) {
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: certPool}}}
 	resp, err := client.Get(url)
 	if err != nil {
-		return 0, "", xerrors.Errorf("could not send a request: %w", err)
+		return 0, "", fmt.Errorf("could not send a request: %w", err)
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return resp.StatusCode, "", xerrors.Errorf("could not read response body: %w", err)
+		return resp.StatusCode, "", fmt.Errorf("could not read response body: %w", err)
 	}
 	return resp.StatusCode, string(b), nil
 }
