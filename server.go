@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/int128/listener"
@@ -16,17 +17,7 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		return "", fmt.Errorf("could not start a local server: %w", err)
 	}
 	defer l.Close()
-
-	switch {
-	case c.LocalServerCertFile == "" && c.LocalServerKeyFile == "":
-	case c.LocalServerCertFile != "" && c.LocalServerKeyFile != "":
-		l.URL.Scheme = "https"
-	default:
-		return "", fmt.Errorf("both LocalServerCertFile and LocalServerKeyFile must be set")
-	}
-	if c.OAuth2Config.RedirectURL == "" {
-		c.OAuth2Config.RedirectURL = l.URL.String()
-	}
+	c.OAuth2Config.RedirectURL = computeRedirectURL(l, c)
 
 	respCh := make(chan *authorizationResponse)
 	server := http.Server{
@@ -72,7 +63,7 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		return nil
 	})
 	if c.LocalServerReadyChan != nil {
-		c.LocalServerReadyChan <- l.URL.String()
+		c.LocalServerReadyChan <- c.OAuth2Config.RedirectURL
 	}
 
 	if err := eg.Wait(); err != nil {
@@ -82,6 +73,14 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		return "", errors.New("no authorization response")
 	}
 	return resp.code, resp.err
+}
+
+func computeRedirectURL(l net.Listener, c *Config) string {
+	hostPort := fmt.Sprintf("%s:%d", c.RedirectURLHostname, l.Addr().(*net.TCPAddr).Port)
+	if c.LocalServerCertFile != "" {
+		return "https://" + hostPort
+	}
+	return "http://" + hostPort
 }
 
 type authorizationResponse struct {
@@ -109,8 +108,8 @@ func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *localServerHandler) handleIndex(w http.ResponseWriter, r *http.Request) {
-	url := h.config.OAuth2Config.AuthCodeURL(h.config.State, h.config.AuthCodeOptions...)
-	http.Redirect(w, r, url, 302)
+	authCodeURL := h.config.OAuth2Config.AuthCodeURL(h.config.State, h.config.AuthCodeOptions...)
+	http.Redirect(w, r, authCodeURL, 302)
 }
 
 func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.Request) *authorizationResponse {

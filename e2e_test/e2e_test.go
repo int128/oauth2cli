@@ -39,6 +39,46 @@ func TestGetToken(t *testing.T) {
 					t.Errorf("scope wants %s but %s", w, r.Scope)
 					return fmt.Sprintf("%s?error=invalid_scope", r.RedirectURI)
 				}
+				redirectURIPrefix := "http://localhost:"
+				if !strings.HasPrefix(r.RedirectURI, redirectURIPrefix) {
+					t.Errorf("redirect_uri wants prefix %s but was %s", redirectURIPrefix, r.RedirectURI)
+					return fmt.Sprintf("%s?error=invalid_redirect_uri", r.RedirectURI)
+				}
+				return fmt.Sprintf("%s?state=%s&code=%s", r.RedirectURI, r.State, "AUTH_CODE")
+			},
+			NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
+				if w := "AUTH_CODE"; r.Code != w {
+					t.Errorf("code wants %s but %s", w, r.Code)
+					return 400, invalidGrantResponse
+				}
+				return 200, validTokenResponse
+			},
+		}
+		successfulTest(t, cfg, h)
+	})
+
+	t.Run("RedirectURLHostname", func(t *testing.T) {
+		cfg := oauth2cli.Config{
+			OAuth2Config: oauth2.Config{
+				ClientID:     "YOUR_CLIENT_ID",
+				ClientSecret: "YOUR_CLIENT_SECRET",
+				Scopes:       []string{"email", "profile"},
+			},
+			RedirectURLHostname:   "127.0.0.1",
+			LocalServerMiddleware: loggingMiddleware(t),
+		}
+		h := &authserver.Handler{
+			T: t,
+			NewAuthorizationResponse: func(r authserver.AuthorizationRequest) string {
+				if w := "email profile"; r.Scope != w {
+					t.Errorf("scope wants %s but %s", w, r.Scope)
+					return fmt.Sprintf("%s?error=invalid_scope", r.RedirectURI)
+				}
+				redirectURIPrefix := "http://127.0.0.1:"
+				if !strings.HasPrefix(r.RedirectURI, redirectURIPrefix) {
+					t.Errorf("redirect_uri wants prefix %s but was %s", redirectURIPrefix, r.RedirectURI)
+					return fmt.Sprintf("%s?error=invalid_redirect_uri", r.RedirectURI)
+				}
 				return fmt.Sprintf("%s?state=%s&code=%s", r.RedirectURI, r.State, "AUTH_CODE")
 			},
 			NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
@@ -70,8 +110,9 @@ func TestGetToken(t *testing.T) {
 					t.Errorf("scope wants %s but %s", w, r.Scope)
 					return fmt.Sprintf("%s?error=invalid_scope", r.RedirectURI)
 				}
-				if !strings.HasPrefix(r.RedirectURI, "https://") {
-					t.Errorf("redirect_uri must start with https:// when using TLS config %s", r.RedirectURI)
+				redirectURIPrefix := "https://localhost:"
+				if !strings.HasPrefix(r.RedirectURI, redirectURIPrefix) {
+					t.Errorf("redirect_uri wants prefix %s but was %s", redirectURIPrefix, r.RedirectURI)
 					return fmt.Sprintf("%s?error=invalid_redirect_uri", r.RedirectURI)
 				}
 				return fmt.Sprintf("%s?state=%s&code=%s", r.RedirectURI, r.State, "AUTH_CODE")

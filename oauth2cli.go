@@ -21,6 +21,10 @@ type Config struct {
 	// OAuth2 config.
 	// RedirectURL will be automatically set to the local server.
 	OAuth2Config oauth2.Config
+	// Hostname of the redirect URL.
+	// You can set this if your provider does not accept localhost.
+	// Default to localhost.
+	RedirectURLHostname string
 	// Options for an authorization request.
 	// You can set oauth2.AccessTypeOffline and the PKCE options here.
 	AuthCodeOptions []oauth2.AuthCodeOption
@@ -67,6 +71,30 @@ type Config struct {
 	LocalServerPort []int
 }
 
+func (c *Config) validateAndSetDefaults() error {
+	if (c.LocalServerCertFile != "" && c.LocalServerKeyFile == "") ||
+		(c.LocalServerCertFile == "" && c.LocalServerKeyFile != "") {
+		return fmt.Errorf("both LocalServerCertFile and LocalServerKeyFile must be set")
+	}
+	if c.RedirectURLHostname == "" {
+		c.RedirectURLHostname = "localhost"
+	}
+	if c.State == "" {
+		s, err := oauth2params.NewState()
+		if err != nil {
+			return fmt.Errorf("could not generate a state parameter: %w", err)
+		}
+		c.State = s
+	}
+	if c.LocalServerMiddleware == nil {
+		c.LocalServerMiddleware = noopMiddleware
+	}
+	if c.LocalServerSuccessHTML == "" {
+		c.LocalServerSuccessHTML = DefaultLocalServerSuccessHTML
+	}
+	return nil
+}
+
 func (c *Config) populateDeprecatedFields() {
 	if len(c.LocalServerPort) > 0 {
 		address := c.LocalServerAddress
@@ -92,18 +120,8 @@ func (c *Config) populateDeprecatedFields() {
 // 	6. Return the code.
 //
 func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
-	if config.State == "" {
-		s, err := oauth2params.NewState()
-		if err != nil {
-			return nil, fmt.Errorf("could not generate a state parameter: %w", err)
-		}
-		config.State = s
-	}
-	if config.LocalServerMiddleware == nil {
-		config.LocalServerMiddleware = noopMiddleware
-	}
-	if config.LocalServerSuccessHTML == "" {
-		config.LocalServerSuccessHTML = DefaultLocalServerSuccessHTML
+	if err := config.validateAndSetDefaults(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 	config.populateDeprecatedFields()
 	code, err := receiveCodeViaLocalServer(ctx, &config)
