@@ -14,7 +14,38 @@ import (
 var noopMiddleware = func(h http.Handler) http.Handler { return h }
 
 // DefaultLocalServerSuccessHTML is a default response body on authorization success.
-const DefaultLocalServerSuccessHTML = `<html><body>OK<script>window.close()</script></body></html>`
+const DefaultLocalServerSuccessHTML = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Authorized</title>
+	<script>
+		window.close()
+	</script>
+	<style>
+		body {
+			background-color: #eee;
+			margin: 0;
+			padding: 0;
+			font-family: sans-serif;
+		}
+		.placeholder {
+			margin: 2em;
+			padding: 2em;
+			background-color: #fff;
+			border-radius: 1em;
+		}
+	</style>
+</head>
+<body>
+	<div class="placeholder">
+		<h1>Authorized</h1>
+		<p>You can close this window.</p>
+	</div>
+</body>
+</html>
+`
 
 // Config represents a config for GetToken.
 type Config struct {
