@@ -3,9 +3,9 @@
 This is a Go package for OAuth 2.0 authorization in a command line interface (CLI) tool.
 You can create a CLI tool with the simple authorization flow for better UX.
 
-Take a look at the demo movie running [the example application](example/).
+Take a look at the screencast of [the example application](example/).
 
-<img alt="demo" src="https://user-images.githubusercontent.com/321266/75102928-26a8ad00-5637-11ea-8d15-8f1213cd5c62.gif" width="652" height="455">
+<img src="https://user-images.githubusercontent.com/321266/87224372-c2a53c00-c3bf-11ea-8419-74380a9e681e.gif" width="572" height="391">
 
 
 ## Purpose
