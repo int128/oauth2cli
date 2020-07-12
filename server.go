@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 
 	"github.com/int128/listener"
 	"golang.org/x/sync/errgroup"
@@ -22,35 +23,32 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	respCh := make(chan *authorizationResponse)
 	server := http.Server{
 		Handler: c.LocalServerMiddleware(&localServerHandler{
-			config:     c,
-			responseCh: respCh,
+			config: c,
+			respCh: respCh,
 		}),
 	}
 	var resp *authorizationResponse
 	var eg errgroup.Group
 	eg.Go(func() error {
-		for {
-			select {
-			case received, ok := <-respCh:
-				if !ok {
-					c.Logf("oauth2cli: response channel has been closed")
-					return nil // channel is closed (after the server is stopped)
-				}
-				if resp == nil {
-					resp = received // pick only the first response
-				}
-				c.Logf("oauth2cli: shutting down the server at %s", l.Addr())
-				if err := server.Shutdown(ctx); err != nil {
-					return fmt.Errorf("could not shutdown the local server: %w", err)
-				}
-			case <-ctx.Done():
-				c.Logf("oauth2cli: context cancelled: %s", ctx.Err())
-				c.Logf("oauth2cli: shutting down the server at %s", l.Addr())
-				if err := server.Shutdown(ctx); err != nil {
-					return fmt.Errorf("could not shutdown the local server: %w", err)
-				}
-				return fmt.Errorf("context cancelled while waiting for authorization response: %w", ctx.Err())
+		select {
+		case gotResp, ok := <-respCh:
+			if !ok {
+				c.Logf("oauth2cli: response channel has been closed")
+				return nil
 			}
+			resp = gotResp
+			c.Logf("oauth2cli: shutting down the server at %s", l.Addr())
+			if err := server.Shutdown(ctx); err != nil {
+				return fmt.Errorf("could not shutdown the local server: %w", err)
+			}
+			return nil
+		case <-ctx.Done():
+			c.Logf("oauth2cli: context cancelled: %s", ctx.Err())
+			c.Logf("oauth2cli: shutting down the server at %s", l.Addr())
+			if err := server.Shutdown(ctx); err != nil {
+				return fmt.Errorf("could not shutdown the local server: %w", err)
+			}
+			return fmt.Errorf("context cancelled while waiting for authorization response: %w", ctx.Err())
 		}
 	})
 	eg.Go(func() error {
@@ -98,16 +96,21 @@ type authorizationResponse struct {
 
 type localServerHandler struct {
 	config     *Config
-	responseCh chan<- *authorizationResponse
+	respCh     chan<- *authorizationResponse // channel to send a response to
+	onceRespCh sync.Once                     // ensure send once
 }
 
 func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	switch {
 	case r.Method == "GET" && r.URL.Path == "/" && q.Get("error") != "":
-		h.responseCh <- h.handleErrorResponse(w, r)
+		h.onceRespCh.Do(func() {
+			h.respCh <- h.handleErrorResponse(w, r)
+		})
 	case r.Method == "GET" && r.URL.Path == "/" && q.Get("code") != "":
-		h.responseCh <- h.handleCodeResponse(w, r)
+		h.onceRespCh.Do(func() {
+			h.respCh <- h.handleCodeResponse(w, r)
+		})
 	case r.Method == "GET" && r.URL.Path == "/":
 		h.handleIndex(w, r)
 	default:
