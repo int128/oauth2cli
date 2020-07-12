@@ -73,6 +73,7 @@ Then set the following options:`)
 		LocalServerReadyChan: ready,
 		LocalServerCertFile:  o.localServerCert,
 		LocalServerKeyFile:   o.localServerKey,
+		Logf:                 log.Printf,
 	}
 
 	ctx := context.Background()

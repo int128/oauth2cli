@@ -33,32 +33,40 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 			select {
 			case received, ok := <-respCh:
 				if !ok {
+					c.Logf("oauth2cli: response channel has been closed")
 					return nil // channel is closed (after the server is stopped)
 				}
 				if resp == nil {
 					resp = received // pick only the first response
 				}
+				c.Logf("oauth2cli: shutting down the server at %s", l.Addr())
 				if err := server.Shutdown(ctx); err != nil {
 					return fmt.Errorf("could not shutdown the local server: %w", err)
 				}
 			case <-ctx.Done():
+				c.Logf("oauth2cli: context cancelled: %s", ctx.Err())
+				c.Logf("oauth2cli: shutting down the server at %s", l.Addr())
 				if err := server.Shutdown(ctx); err != nil {
 					return fmt.Errorf("could not shutdown the local server: %w", err)
 				}
-				return fmt.Errorf("context done while waiting for authorization response: %w", ctx.Err())
+				return fmt.Errorf("context cancelled while waiting for authorization response: %w", ctx.Err())
 			}
 		}
 	})
 	eg.Go(func() error {
 		defer close(respCh)
 		if c.LocalServerCertFile != "" && c.LocalServerKeyFile != "" {
+			c.Logf("oauth2cli: starting HTTPS server at %s", l.Addr())
 			if err := server.ServeTLS(l, c.LocalServerCertFile, c.LocalServerKeyFile); err != nil && err != http.ErrServerClosed {
-				return fmt.Errorf("could not start a local TLS server: %w", err)
+				return fmt.Errorf("could not start HTTPS server: %w", err)
 			}
+			c.Logf("oauth2cli: stopped HTTPS server at %s", l.Addr())
 		} else {
+			c.Logf("oauth2cli: starting HTTP server at %s", l.Addr())
 			if err := server.Serve(l); err != nil && err != http.ErrServerClosed {
-				return fmt.Errorf("could not start a local server: %w", err)
+				return fmt.Errorf("could not start HTTP server: %w", err)
 			}
+			c.Logf("oauth2cli: stopped HTTP server at %s", l.Addr())
 		}
 		return nil
 	})
@@ -109,6 +117,7 @@ func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *localServerHandler) handleIndex(w http.ResponseWriter, r *http.Request) {
 	authCodeURL := h.config.OAuth2Config.AuthCodeURL(h.config.State, h.config.AuthCodeOptions...)
+	h.config.Logf("oauth2cli: sending redirect to %s", authCodeURL)
 	http.Redirect(w, r, authCodeURL, 302)
 }
 
