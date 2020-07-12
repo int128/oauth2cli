@@ -89,6 +89,9 @@ type Config struct {
 	// A channel to send its URL when the local server is ready. Default to none.
 	LocalServerReadyChan chan<- string
 
+	// Logger function for debug.
+	Logf func(format string, args ...interface{})
+
 	// DEPRECATED: this will be removed in the future release.
 	// Use LocalServerBindAddress instead.
 	// Address which the local server binds to.
@@ -123,6 +126,9 @@ func (c *Config) validateAndSetDefaults() error {
 	if c.LocalServerSuccessHTML == "" {
 		c.LocalServerSuccessHTML = DefaultLocalServerSuccessHTML
 	}
+	if c.Logf == nil {
+		c.Logf = func(string, ...interface{}) {}
+	}
 	return nil
 }
 
@@ -150,16 +156,17 @@ func (c *Config) populateDeprecatedFields() {
 // 	5. Exchange the code and a token.
 // 	6. Return the code.
 //
-func GetToken(ctx context.Context, config Config) (*oauth2.Token, error) {
-	if err := config.validateAndSetDefaults(); err != nil {
+func GetToken(ctx context.Context, c Config) (*oauth2.Token, error) {
+	if err := c.validateAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	config.populateDeprecatedFields()
-	code, err := receiveCodeViaLocalServer(ctx, &config)
+	c.populateDeprecatedFields()
+	code, err := receiveCodeViaLocalServer(ctx, &c)
 	if err != nil {
 		return nil, fmt.Errorf("authorization error: %w", err)
 	}
-	token, err := config.OAuth2Config.Exchange(ctx, code, config.TokenRequestOptions...)
+	c.Logf("oauth2cli: exchanging the code and token")
+	token, err := c.OAuth2Config.Exchange(ctx, code, c.TokenRequestOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("could not exchange the code and token: %w", err)
 	}
