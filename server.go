@@ -17,7 +17,8 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not start a local server: %w", err)
 	}
-	defer l.Close()
+	// listener l will be closed by server.Close()
+
 	c.OAuth2Config.RedirectURL = computeRedirectURL(l, c)
 
 	respCh := make(chan *authorizationResponse)
@@ -37,16 +38,15 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 				return nil
 			}
 			resp = gotResp
-			c.Logf("oauth2cli: shutting down the server at %s", l.Addr())
-			if err := server.Shutdown(ctx); err != nil {
-				return fmt.Errorf("could not shutdown the local server: %w", err)
+			c.Logf("oauth2cli: closing the server at %s", l.Addr())
+			if err := server.Close(); err != nil {
+				return fmt.Errorf("could not close the local server: %w", err)
 			}
 			return nil
 		case <-ctx.Done():
-			c.Logf("oauth2cli: context cancelled: %s", ctx.Err())
-			c.Logf("oauth2cli: shutting down the server at %s", l.Addr())
-			if err := server.Shutdown(ctx); err != nil {
-				return fmt.Errorf("could not shutdown the local server: %w", err)
+			c.Logf("oauth2cli: context cancel, closing the server at %s", l.Addr())
+			if err := server.Close(); err != nil {
+				return fmt.Errorf("could not close the local server: %w", err)
 			}
 			return fmt.Errorf("context cancelled while waiting for authorization response: %w", ctx.Err())
 		}
