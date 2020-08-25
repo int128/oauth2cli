@@ -53,18 +53,16 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	})
 	eg.Go(func() error {
 		defer close(respCh)
-		if c.LocalServerCertFile != "" && c.LocalServerKeyFile != "" {
-			c.Logf("oauth2cli: starting HTTPS server at %s", l.Addr())
+		c.Logf("oauth2cli: starting a local server at %s", l.Addr())
+		defer c.Logf("oauth2cli: stopped the local server at %s", l.Addr())
+		if c.isLocalServerHTTPS() {
 			if err := server.ServeTLS(l, c.LocalServerCertFile, c.LocalServerKeyFile); err != nil && err != http.ErrServerClosed {
 				return fmt.Errorf("could not start HTTPS server: %w", err)
 			}
-			c.Logf("oauth2cli: stopped HTTPS server at %s", l.Addr())
-		} else {
-			c.Logf("oauth2cli: starting HTTP server at %s", l.Addr())
-			if err := server.Serve(l); err != nil && err != http.ErrServerClosed {
-				return fmt.Errorf("could not start HTTP server: %w", err)
-			}
-			c.Logf("oauth2cli: stopped HTTP server at %s", l.Addr())
+			return nil
+		}
+		if err := server.Serve(l); err != nil && err != http.ErrServerClosed {
+			return fmt.Errorf("could not start HTTP server: %w", err)
 		}
 		return nil
 	})
