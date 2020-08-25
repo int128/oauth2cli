@@ -105,6 +105,10 @@ type Config struct {
 	LocalServerPort []int
 }
 
+func (c *Config) isLocalServerHTTPS() bool {
+	return c.LocalServerCertFile != "" && c.LocalServerKeyFile != ""
+}
+
 func (c *Config) validateAndSetDefaults() error {
 	if (c.LocalServerCertFile != "" && c.LocalServerKeyFile == "") ||
 		(c.LocalServerCertFile == "" && c.LocalServerKeyFile != "") {
