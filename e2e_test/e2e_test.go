@@ -209,6 +209,7 @@ func successfulTest(t *testing.T, cfg oauth2cli.Config, h *authserver.Handler) {
 	openBrowserCh := make(chan string)
 	defer close(openBrowserCh)
 
+	cfg.Logf = t.Logf
 	cfg.LocalServerReadyChan = openBrowserCh
 	cfg.OAuth2Config.Endpoint = oauth2.Endpoint{
 		AuthURL:  s.URL + "/auth",
@@ -271,6 +272,7 @@ func errorAuthorizationResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	defer s.Close()
 	openBrowserCh := make(chan string)
 	defer close(openBrowserCh)
+	cfg.Logf = t.Logf
 	cfg.LocalServerReadyChan = openBrowserCh
 	cfg.OAuth2Config.Endpoint = oauth2.Endpoint{
 		AuthURL:  s.URL + "/auth",
@@ -325,6 +327,7 @@ func errorTokenResponseTest(t *testing.T, cfg oauth2cli.Config) {
 	defer s.Close()
 	openBrowserCh := make(chan string)
 	defer close(openBrowserCh)
+	cfg.Logf = t.Logf
 	cfg.LocalServerReadyChan = openBrowserCh
 	cfg.OAuth2Config.Endpoint = oauth2.Endpoint{
 		AuthURL:  s.URL + "/auth",
