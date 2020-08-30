@@ -2,9 +2,9 @@ package e2e_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,15 +12,16 @@ import (
 	"github.com/int128/oauth2cli/e2e_test/authserver"
 	"github.com/int128/oauth2cli/e2e_test/client"
 	"golang.org/x/oauth2"
-	"golang.org/x/sync/errgroup"
 )
 
 func TestPKCE(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
 	defer cancel()
 	openBrowserCh := make(chan string)
-	var eg errgroup.Group
-	eg.Go(func() error {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		defer close(openBrowserCh)
 		// PKCE test fixture: https://tools.ietf.org/html/rfc7636
 		const codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
@@ -76,7 +77,8 @@ func TestPKCE(t *testing.T) {
 		}
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {
-			return fmt.Errorf("could not get a token: %w", err)
+			t.Errorf("could not get a token: %s", err)
+			return
 		}
 		if "ACCESS_TOKEN" != token.AccessToken {
 			t.Errorf("AccessToken wants %s but %s", "ACCESS_TOKEN", token.AccessToken)
@@ -84,33 +86,16 @@ func TestPKCE(t *testing.T) {
 		if "REFRESH_TOKEN" != token.RefreshToken {
 			t.Errorf("RefreshToken wants %s but %s", "REFRESH_TOKEN", token.AccessToken)
 		}
-		return nil
-	})
-	eg.Go(func() error {
-		// Wait for the local server and open a browser request.
-		select {
-		case to, ok := <-openBrowserCh:
-			if !ok {
-				t.Logf("server already closed")
-				return errors.New("server already closed")
-			}
-			status, body, err := client.Get(to)
-			if err != nil {
-				return fmt.Errorf("could not open browser request: %w", err)
-			}
-			t.Logf("got response body: %s", body)
-			if status != 200 {
-				t.Errorf("status wants 200 but %d", status)
-			}
-			if body != oauth2cli.DefaultLocalServerSuccessHTML {
-				t.Errorf("response body did not match")
-			}
-			return nil
-		case <-ctx.Done():
-			return fmt.Errorf("context done while waiting for opening browser: %w", ctx.Err())
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		toURL, ok := <-openBrowserCh
+		if !ok {
+			t.Errorf("server already closed")
+			return
 		}
-	})
-	if err := eg.Wait(); err != nil {
-		t.Errorf("error: %+v", err)
-	}
+		client.GetAndVerify(t, toURL, 200, oauth2cli.DefaultLocalServerSuccessHTML)
+	}()
+	wg.Wait()
 }
