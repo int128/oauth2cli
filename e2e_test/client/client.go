@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 var certPool = x509.NewCertPool()
@@ -32,4 +35,18 @@ func Get(url string) (int, string, error) {
 		return resp.StatusCode, "", fmt.Errorf("could not read response body: %w", err)
 	}
 	return resp.StatusCode, string(b), nil
+}
+
+func GetAndVerify(t *testing.T, url string, code int, body string) {
+	gotCode, gotBody, err := Get(url)
+	if err != nil {
+		t.Errorf("could not open browser request: %s", err)
+		return
+	}
+	if gotCode != code {
+		t.Errorf("status wants %d but %d", code, gotCode)
+	}
+	if gotBody != body {
+		t.Errorf("response body did not match: %s", cmp.Diff(gotBody, body))
+	}
 }
