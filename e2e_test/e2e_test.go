@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -89,23 +90,39 @@ func TestRedirectURLHostname(t *testing.T) {
 func doAuthCodeFlow(t *testing.T, cfg oauth2cli.Config, h *authserver.Handler) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
 	defer cancel()
-	s := httptest.NewServer(h)
-	defer s.Close()
 	openBrowserCh := make(chan string)
-	defer close(openBrowserCh)
-
-	cfg.LocalServerReadyChan = openBrowserCh
-	cfg.OAuth2Config.Endpoint = oauth2.Endpoint{
-		AuthURL:  s.URL + "/auth",
-		TokenURL: s.URL + "/token",
-	}
-	cfg.LocalServerMiddleware = loggingMiddleware(t)
-
-	eg, ctx := errgroup.WithContext(ctx)
+	var eg errgroup.Group
+	eg.Go(func() error {
+		defer close(openBrowserCh)
+		// Start a local server and get a token.
+		s := httptest.NewServer(h)
+		defer s.Close()
+		cfg.LocalServerReadyChan = openBrowserCh
+		cfg.OAuth2Config.Endpoint = oauth2.Endpoint{
+			AuthURL:  s.URL + "/auth",
+			TokenURL: s.URL + "/token",
+		}
+		cfg.LocalServerMiddleware = loggingMiddleware(t)
+		token, err := oauth2cli.GetToken(ctx, cfg)
+		if err != nil {
+			return fmt.Errorf("could not get a token: %w", err)
+		}
+		if "ACCESS_TOKEN" != token.AccessToken {
+			t.Errorf("AccessToken wants %s but %s", "ACCESS_TOKEN", token.AccessToken)
+		}
+		if "REFRESH_TOKEN" != token.RefreshToken {
+			t.Errorf("RefreshToken wants %s but %s", "REFRESH_TOKEN", token.AccessToken)
+		}
+		return nil
+	})
 	eg.Go(func() error {
 		// Wait for the local server and open a browser request.
 		select {
-		case to := <-openBrowserCh:
+		case to, ok := <-openBrowserCh:
+			if !ok {
+				t.Logf("server already closed")
+				return errors.New("server already closed")
+			}
 			status, body, err := client.Get(to)
 			if err != nil {
 				return fmt.Errorf("could not open browser request: %w", err)
@@ -121,20 +138,6 @@ func doAuthCodeFlow(t *testing.T, cfg oauth2cli.Config, h *authserver.Handler) {
 		case <-ctx.Done():
 			return fmt.Errorf("context done while waiting for opening browser: %w", ctx.Err())
 		}
-	})
-	eg.Go(func() error {
-		// Start a local server and get a token.
-		token, err := oauth2cli.GetToken(ctx, cfg)
-		if err != nil {
-			return fmt.Errorf("could not get a token: %w", err)
-		}
-		if "ACCESS_TOKEN" != token.AccessToken {
-			t.Errorf("AccessToken wants %s but %s", "ACCESS_TOKEN", token.AccessToken)
-		}
-		if "REFRESH_TOKEN" != token.RefreshToken {
-			t.Errorf("RefreshToken wants %s but %s", "REFRESH_TOKEN", token.AccessToken)
-		}
-		return nil
 	})
 	if err := eg.Wait(); err != nil {
 		t.Errorf("error: %+v", err)
