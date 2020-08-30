@@ -66,10 +66,18 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		}
 		return nil
 	})
-	if c.LocalServerReadyChan != nil {
-		c.LocalServerReadyChan <- c.OAuth2Config.RedirectURL
-	}
-
+	eg.Go(func() error {
+		if c.LocalServerReadyChan == nil {
+			return nil
+		}
+		select {
+		case c.LocalServerReadyChan <- c.OAuth2Config.RedirectURL:
+			c.Logf("oauth2cli: wrote a URL to LocalServerReadyChan: %s", c.OAuth2Config.RedirectURL)
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
 	if err := eg.Wait(); err != nil {
 		return "", fmt.Errorf("authorization error: %w", err)
 	}
