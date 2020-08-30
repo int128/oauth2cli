@@ -5,6 +5,7 @@ on:
       - .github/workflows/test.yaml
       - '**.go'
       - Makefile
+      - go.*
 jobs:
   test:
     runs-on: ubuntu-latest
