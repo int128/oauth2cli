@@ -44,6 +44,7 @@ func TestErrorAuthorizationResponse(t *testing.T) {
 				},
 			},
 			LocalServerReadyChan: openBrowserCh,
+			Logf:                 t.Logf,
 		}
 		_, err := oauth2cli.GetToken(ctx, cfg)
 		if err == nil {
@@ -107,6 +108,7 @@ func TestErrorTokenResponse(t *testing.T) {
 				},
 			},
 			LocalServerReadyChan: openBrowserCh,
+			Logf:                 t.Logf,
 		}
 		_, err := oauth2cli.GetToken(ctx, cfg)
 		if err == nil {

@@ -103,6 +103,7 @@ func doAuthCodeFlow(t *testing.T, cfg oauth2cli.Config, h *authserver.Handler) {
 			TokenURL: s.URL + "/token",
 		}
 		cfg.LocalServerMiddleware = loggingMiddleware(t)
+		cfg.Logf = t.Logf
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {
 			return fmt.Errorf("could not get a token: %w", err)
