@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/int128/listener"
 	"golang.org/x/sync/errgroup"
@@ -27,34 +28,13 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 			respCh: respCh,
 		}),
 	}
+	shutdownCh := make(chan struct{})
 	var resp *authorizationResponse
 	var eg errgroup.Group
 	eg.Go(func() error {
-		select {
-		case gotResp, ok := <-respCh:
-			if !ok {
-				c.Logf("oauth2cli: response channel has been closed")
-				return nil
-			}
-			resp = gotResp
-			c.Logf("oauth2cli: shutting down the server at %s", l.Addr())
-			if err := server.Shutdown(ctx); err != nil {
-				return fmt.Errorf("could not shutdown the local server: %w", err)
-			}
-			return nil
-		case <-ctx.Done():
-			c.Logf("oauth2cli: context cancelled: %s", ctx.Err())
-			c.Logf("oauth2cli: shutting down the server at %s", l.Addr())
-			if err := server.Shutdown(ctx); err != nil {
-				return fmt.Errorf("could not shutdown the local server: %w", err)
-			}
-			return fmt.Errorf("context cancelled while waiting for authorization response: %w", ctx.Err())
-		}
-	})
-	eg.Go(func() error {
 		defer close(respCh)
-		c.Logf("oauth2cli: starting a local server at %s", l.Addr())
-		defer c.Logf("oauth2cli: stopped the local server at %s", l.Addr())
+		c.Logf("oauth2cli: starting a server at %s", l.Addr())
+		defer c.Logf("oauth2cli: stopped the server")
 		if c.isLocalServerHTTPS() {
 			if err := server.ServeTLS(l, c.LocalServerCertFile, c.LocalServerKeyFile); err != nil && err != http.ErrServerClosed {
 				return fmt.Errorf("could not start HTTPS server: %w", err)
@@ -67,12 +47,38 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		return nil
 	})
 	eg.Go(func() error {
+		defer close(shutdownCh)
+		select {
+		case gotResp, ok := <-respCh:
+			if ok {
+				resp = gotResp
+			}
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+	eg.Go(func() error {
+		<-shutdownCh
+		// Gracefully shutdown the server in the timeout.
+		// If the server has not started, Shutdown returns nil and this returns immediately.
+		// If Shutdown has failed, force-close the server.
+		c.Logf("oauth2cli: shutting down the server")
+		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			c.Logf("oauth2cli: force-closing the server: shutdown failed: %s", err)
+			_ = server.Close()
+			return nil
+		}
+		return nil
+	})
+	eg.Go(func() error {
 		if c.LocalServerReadyChan == nil {
 			return nil
 		}
 		select {
 		case c.LocalServerReadyChan <- c.OAuth2Config.RedirectURL:
-			c.Logf("oauth2cli: wrote a URL to LocalServerReadyChan: %s", c.OAuth2Config.RedirectURL)
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
