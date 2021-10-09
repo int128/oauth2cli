@@ -14,7 +14,7 @@ import (
 var certPool = x509.NewCertPool()
 
 func init() {
-	data, err := ioutil.ReadFile("testdata/ca.pem")
+	data, err := ioutil.ReadFile("testdata/ca.crt")
 	if err != nil {
 		panic(err)
 	}
