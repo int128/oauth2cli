@@ -89,6 +89,11 @@ type Config struct {
 	// A channel to send its URL when the local server is ready. Default to none.
 	LocalServerReadyChan chan<- string
 
+	// Redirect URL upon successful login
+	SuccessRedirectUrl string
+	// Redirect URL upon failed login
+	FailureRedirectUrl string
+
 	// Logger function for debug.
 	Logf func(format string, args ...interface{})
 }
@@ -117,6 +122,10 @@ func (c *Config) validateAndSetDefaults() error {
 	}
 	if c.LocalServerSuccessHTML == "" {
 		c.LocalServerSuccessHTML = DefaultLocalServerSuccessHTML
+	}
+	if (c.SuccessRedirectUrl != "" && c.FailureRedirectUrl == "") ||
+		(c.SuccessRedirectUrl == "" && c.FailureRedirectUrl != "") {
+		return fmt.Errorf("when using success and failure redirect URLs, set both URLs")
 	}
 	if c.Logf == nil {
 		c.Logf = func(string, ...interface{}) {}
