@@ -1,0 +1,42 @@
+name: go
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/go.yaml
+      - '**/*.go'
+      - go.*
+  push:
+    paths:
+      - .github/workflows/go.yaml
+      - '**/*.go'
+      - go.*
+    branches:
+      - master
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+      - uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.38.0
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: go-linux-amd64-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-linux-amd64-
+      - run: go test -v -race ./...
