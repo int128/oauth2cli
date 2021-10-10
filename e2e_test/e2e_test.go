@@ -219,8 +219,8 @@ func TestSuccessRedirect(t *testing.T) {
 			},
 			LocalServerReadyChan:  openBrowserCh,
 			LocalServerMiddleware: loggingMiddleware(t),
-			SuccessRedirectUrl:    sr.URL + "/success",
-			FailureRedirectUrl:    sr.URL + "/failure",
+			SuccessRedirectURL:    sr.URL + "/success",
+			FailureRedirectURL:    sr.URL + "/failure",
 			Logf:                  t.Logf,
 		}
 		token, err := oauth2cli.GetToken(ctx, cfg)

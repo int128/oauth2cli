@@ -90,9 +90,9 @@ type Config struct {
 	LocalServerReadyChan chan<- string
 
 	// Redirect URL upon successful login
-	SuccessRedirectUrl string
+	SuccessRedirectURL string
 	// Redirect URL upon failed login
-	FailureRedirectUrl string
+	FailureRedirectURL string
 
 	// Logger function for debug.
 	Logf func(format string, args ...interface{})
@@ -123,8 +123,8 @@ func (c *Config) validateAndSetDefaults() error {
 	if c.LocalServerSuccessHTML == "" {
 		c.LocalServerSuccessHTML = DefaultLocalServerSuccessHTML
 	}
-	if (c.SuccessRedirectUrl != "" && c.FailureRedirectUrl == "") ||
-		(c.SuccessRedirectUrl == "" && c.FailureRedirectUrl != "") {
+	if (c.SuccessRedirectURL != "" && c.FailureRedirectURL == "") ||
+		(c.SuccessRedirectURL == "" && c.FailureRedirectURL != "") {
 		return fmt.Errorf("when using success and failure redirect URLs, set both URLs")
 	}
 	if c.Logf == nil {

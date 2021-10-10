@@ -109,8 +109,8 @@ func TestFailureRedirect(t *testing.T) {
 				},
 			},
 			LocalServerReadyChan: openBrowserCh,
-			SuccessRedirectUrl:   sr.URL + "/success",
-			FailureRedirectUrl:   sr.URL + "/failure",
+			SuccessRedirectURL:   sr.URL + "/success",
+			FailureRedirectURL:   sr.URL + "/failure",
 			Logf:                 t.Logf,
 		}
 		_, err := oauth2cli.GetToken(ctx, cfg)
