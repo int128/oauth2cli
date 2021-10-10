@@ -145,8 +145,8 @@ func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.R
 		return &authorizationResponse{err: fmt.Errorf("state does not match (wants %s but got %s)", h.config.State, state)}
 	}
 
-	if h.config.SuccessRedirectUrl != "" {
-		http.Redirect(w, r, h.config.SuccessRedirectUrl, http.StatusFound)
+	if h.config.SuccessRedirectURL != "" {
+		http.Redirect(w, r, h.config.SuccessRedirectURL, http.StatusFound)
 	} else {
 		w.Header().Add("Content-Type", "text/html")
 		if _, err := fmt.Fprintf(w, h.config.LocalServerSuccessHTML); err != nil {
@@ -167,8 +167,8 @@ func (h *localServerHandler) handleErrorResponse(w http.ResponseWriter, r *http.
 }
 
 func (h *localServerHandler) authorizationError(w http.ResponseWriter, r *http.Request) {
-	if h.config.FailureRedirectUrl != "" {
-		http.Redirect(w, r, h.config.FailureRedirectUrl, http.StatusFound)
+	if h.config.FailureRedirectURL != "" {
+		http.Redirect(w, r, h.config.FailureRedirectURL, http.StatusFound)
 	} else {
 		http.Error(w, "authorization error", 500)
 	}
