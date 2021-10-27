@@ -1,11 +1,11 @@
-# oauth2cli [![CircleCI](https://circleci.com/gh/int128/oauth2cli.svg?style=shield)](https://circleci.com/gh/int128/oauth2cli) [![GoDoc](https://godoc.org/github.com/int128/oauth2cli?status.svg)](https://godoc.org/github.com/int128/oauth2cli)
+# oauth2cli ![test](https://github.com/int128/oauth2cli/workflows/test/badge.svg) [![GoDoc](https://godoc.org/github.com/int128/oauth2cli?status.svg)](https://godoc.org/github.com/int128/oauth2cli)
 
 This is a Go package for OAuth 2.0 authorization in a command line interface (CLI) tool.
 You can create a CLI tool with the simple authorization flow for better UX.
 
-Take a look at the demo movie running [the example application](example/).
+Take a look at the screencast of [the example application](example/).
 
-<img alt="example" src="https://user-images.githubusercontent.com/321266/67554896-35e02280-f74b-11e9-8d32-392c13b4804a.gif" width="650" height="470">
+<img src="https://user-images.githubusercontent.com/321266/87224372-c2a53c00-c3bf-11ea-8419-74380a9e681e.gif" width="572" height="391">
 
 
 ## Purpose

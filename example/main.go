@@ -3,17 +3,22 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
 
 	"github.com/int128/oauth2cli"
+	"github.com/int128/oauth2cli/oauth2params"
 	"github.com/pkg/browser"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 )
+
+func init() {
+	log.SetFlags(log.Lshortfile | log.Lmicroseconds)
+}
 
 type cmdOptions struct {
 	authURL         string
@@ -21,7 +26,6 @@ type cmdOptions struct {
 	clientID        string
 	clientSecret    string
 	scopes          string
-	usePKCE         bool
 	localServerCert string
 	localServerKey  string
 }
@@ -33,7 +37,6 @@ func main() {
 	flag.StringVar(&o.clientID, "client-id", "", "OAuth Client ID")
 	flag.StringVar(&o.clientSecret, "client-secret", "", "OAuth Client Secret (optional)")
 	flag.StringVar(&o.scopes, "scopes", "email", "Scopes to request, comma separated")
-	flag.BoolVar(&o.usePKCE, "pkce", false, "Enable PKCE")
 	flag.StringVar(&o.localServerCert, "local-server-cert", "", "Path to a certificate file for the local server (optional)")
 	flag.StringVar(&o.localServerKey, "local-server-key", "", "Path to a key file for the local server (optional)")
 	flag.Parse()
@@ -45,7 +48,14 @@ Then set the following options:`)
 		os.Exit(1)
 		return
 	}
+	if o.localServerCert != "" {
+		log.Printf("Using the TLS certificate: %s", o.localServerCert)
+	}
 
+	pkce, err := oauth2params.NewPKCE()
+	if err != nil {
+		log.Fatalf("error: %s", err)
+	}
 	ready := make(chan string, 1)
 	defer close(ready)
 	cfg := oauth2cli.Config{
@@ -58,16 +68,12 @@ Then set the following options:`)
 			},
 			Scopes: strings.Split(o.scopes, ","),
 		},
-		LocalServerBindAddress: []string{"127.0.0.1:8000", "127.0.0.1:18000"},
-		LocalServerReadyChan:   ready,
-		LocalServerCertFile:    o.localServerCert,
-		LocalServerKeyFile:     o.localServerKey,
-	}
-	if o.localServerCert != "" {
-		log.Printf("Using the TLS certificate: %s", o.localServerCert)
-	}
-	if o.usePKCE {
-		configurePKCE(&cfg)
+		AuthCodeOptions:      pkce.AuthCodeOptions(),
+		TokenRequestOptions:  pkce.TokenRequestOptions(),
+		LocalServerReadyChan: ready,
+		LocalServerCertFile:  o.localServerCert,
+		LocalServerKeyFile:   o.localServerKey,
+		Logf:                 log.Printf,
 	}
 
 	ctx := context.Background()
@@ -80,19 +86,19 @@ Then set the following options:`)
 				log.Printf("could not open the browser: %s", err)
 			}
 			return nil
-		case err := <-ctx.Done():
-			return xerrors.Errorf("context done while waiting for authorization: %w", err)
+		case <-ctx.Done():
+			return fmt.Errorf("context done while waiting for authorization: %w", ctx.Err())
 		}
 	})
 	eg.Go(func() error {
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {
-			return xerrors.Errorf("could not get a token: %w", err)
+			return fmt.Errorf("could not get a token: %w", err)
 		}
 		log.Printf("You got a valid token until %s", token.Expiry)
 		return nil
 	})
 	if err := eg.Wait(); err != nil {
-		log.Printf("error while authorization: %s", err)
+		log.Fatalf("authorization error: %s", err)
 	}
 }
