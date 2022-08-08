@@ -160,3 +160,16 @@ func GetToken(ctx context.Context, c Config) (*oauth2.Token, error) {
 	}
 	return token, nil
 }
+
+
+func GetCode(ctx context.Context, c Config) (string, error) {
+	if err := c.validateAndSetDefaults(); err != nil {
+		return "", fmt.Errorf("invalid config: %w", err)
+	}
+	code, err := receiveCodeViaLocalServer(ctx, &c)
+	if err != nil {
+		return "", fmt.Errorf("authorization error: %w", err)
+	}
+
+	return code, nil
+}
