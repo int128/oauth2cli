@@ -1,4 +1,4 @@
-module github.com/int128/oauth2cli
+module github.com/trietsch/oauth2cli
 
 require (
 	github.com/google/go-cmp v0.5.9
