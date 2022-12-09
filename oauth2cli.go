@@ -5,9 +5,9 @@ package oauth2cli
 import (
 	"context"
 	"fmt"
+	"github.com/trietsch/oauth2cli/oauth2params"
 	"net/http"
 
-	"github.com/int128/oauth2cli/oauth2params"
 	"golang.org/x/oauth2"
 )
 
