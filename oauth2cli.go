@@ -4,8 +4,10 @@ package oauth2cli
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
-	"github.com/trietsch/oauth2cli/oauth2params"
+	"github.com/int128/oauth2cli/oauth2params"
 	"net/http"
 
 	"golang.org/x/oauth2"
@@ -156,7 +158,23 @@ func GetToken(ctx context.Context, c Config) (*oauth2.Token, error) {
 	if err := c.validateAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	code, err := GetCode(ctx, c)
+	var code string
+	var err error
+
+	if c.NonInteractive {
+		var codeAndConfig *OAuth2ConfigAndCode
+		codeAndConfig, err = receiveCodeViaUserInput(&c)
+
+		if err != nil {
+			return nil, fmt.Errorf("error parsing user input: %w", err)
+		}
+
+		code = (*codeAndConfig).Code
+		c.OAuth2Config = (*codeAndConfig).OAuth2Config
+	} else {
+		code, err = receiveCodeViaLocalServer(ctx, &c)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("authorization error: %w", err)
 	}
@@ -168,15 +186,32 @@ func GetToken(ctx context.Context, c Config) (*oauth2.Token, error) {
 	return token, nil
 }
 
-func GetCode(ctx context.Context, c Config) (string, error) {
-	var code string
-	var err error
+type OAuth2ConfigAndCode struct {
+	OAuth2Config oauth2.Config
+	Code         string
+}
 
-	if c.NonInteractive {
-		code, err = receiveCodeViaUserInput(&c)
-	} else {
-		code, err = receiveCodeViaLocalServer(ctx, &c)
+// GetCodeAndConfig cuts the authorization code flow in half. This allows for the
+// login process to be performed on headless machines that do not have access to a
+// browser by doing the interactive login on a machine that does have access to
+// a browser, and copying the result onto the headless machine.
+// The response of this function is a JSON that includes both the used
+// OAuth2Config and the authorization code, as a base64 encoded string.
+// This is the same string that receiveCodeViaUserInput expects
+func GetCodeAndConfig(ctx context.Context, c Config) (*string, error) {
+	if err := c.validateAndSetDefaults(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	return code, err
+	code, err := receiveCodeViaLocalServer(ctx, &c)
+
+	configAndCode := OAuth2ConfigAndCode{
+		OAuth2Config: c.OAuth2Config,
+		Code:         code,
+	}
+
+	bytes, err := json.Marshal(configAndCode)
+	jsonCodeAndConfig := base64.StdEncoding.EncodeToString(bytes)
+
+	return &jsonCodeAndConfig, err
 }
