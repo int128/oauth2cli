@@ -94,6 +94,11 @@ type Config struct {
 	// Redirect URL upon failed login
 	FailureRedirectURL string
 
+	// Allow non-interactive login flows (headless machines without a browser available)
+	NonInteractive bool
+	// Instructions to print to stdout for non-interactive flows
+	NonInteractivePromptText string
+
 	// Logger function for debug.
 	Logf func(format string, args ...interface{})
 }
@@ -127,6 +132,9 @@ func (c *Config) validateAndSetDefaults() error {
 		(c.SuccessRedirectURL == "" && c.FailureRedirectURL != "") {
 		return fmt.Errorf("when using success and failure redirect URLs, set both URLs")
 	}
+	if c.NonInteractivePromptText == "" {
+		c.NonInteractivePromptText = "Please enter a valid authorization code flow code: "
+	}
 	if c.Logf == nil {
 		c.Logf = func(string, ...interface{}) {}
 	}
@@ -138,18 +146,17 @@ func (c *Config) validateAndSetDefaults() error {
 //
 // This performs the following steps:
 //
-//	1. Start a local server at the port.
-//	2. Open a browser and navigate it to the local server.
-//	3. Wait for the user authorization.
-// 	4. Receive a code via an authorization response (HTTP redirect).
-// 	5. Exchange the code and a token.
-// 	6. Return the code.
-//
+//  1. Start a local server at the port.
+//  2. Open a browser and navigate it to the local server.
+//  3. Wait for the user authorization.
+//  4. Receive a code via an authorization response (HTTP redirect).
+//  5. Exchange the code and a token.
+//  6. Return the code.
 func GetToken(ctx context.Context, c Config) (*oauth2.Token, error) {
 	if err := c.validateAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	code, err := receiveCodeViaLocalServer(ctx, &c)
+	code, err := GetCode(ctx, c)
 	if err != nil {
 		return nil, fmt.Errorf("authorization error: %w", err)
 	}
@@ -159,4 +166,17 @@ func GetToken(ctx context.Context, c Config) (*oauth2.Token, error) {
 		return nil, fmt.Errorf("could not exchange the code and token: %w", err)
 	}
 	return token, nil
+}
+
+func GetCode(ctx context.Context, c Config) (string, error) {
+	var code string
+	var err error
+
+	if c.NonInteractive {
+		code, err = receiveCodeViaUserInput(&c)
+	} else {
+		code, err = receiveCodeViaLocalServer(ctx, &c)
+	}
+
+	return code, err
 }
