@@ -204,14 +204,21 @@ func GetCodeAndConfig(ctx context.Context, c Config) (*string, error) {
 	}
 
 	code, err := receiveCodeViaLocalServer(ctx, &c)
+	if err != nil {
+		return nil, err
+	}
 
 	configAndCode := OAuth2ConfigAndCode{
 		OAuth2Config: c.OAuth2Config,
 		Code:         code,
 	}
 
-	bytes, err := json.Marshal(configAndCode)
+	bytes, unmarshalErr := json.Marshal(configAndCode)
 	jsonCodeAndConfig := base64.StdEncoding.EncodeToString(bytes)
 
-	return &jsonCodeAndConfig, err
+	if unmarshalErr != nil {
+		return nil, unmarshalErr
+	}
+
+	return &jsonCodeAndConfig, nil
 }
