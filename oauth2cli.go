@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/int128/oauth2cli/oauth2params"
 	"golang.org/x/oauth2"
+
+	"github.com/int128/oauth2cli/oauth2params"
 )
 
 var noopMiddleware = func(h http.Handler) http.Handler { return h }
@@ -56,6 +57,9 @@ type Config struct {
 	// You can set this if your provider does not accept localhost.
 	// Default to localhost.
 	RedirectURLHostname string
+	// RedirectURLPath is the path of the redirect URL.
+	// Default to /.
+	RedirectURLPath string
 	// Options for an authorization request.
 	// You can set oauth2.AccessTypeOffline and the PKCE options here.
 	AuthCodeOptions []oauth2.AuthCodeOption
@@ -138,13 +142,12 @@ func (c *Config) validateAndSetDefaults() error {
 //
 // This performs the following steps:
 //
-//	1. Start a local server at the port.
-//	2. Open a browser and navigate it to the local server.
-//	3. Wait for the user authorization.
-// 	4. Receive a code via an authorization response (HTTP redirect).
-// 	5. Exchange the code and a token.
-// 	6. Return the code.
-//
+//  1. Start a local server at the port.
+//  2. Open a browser and navigate it to the local server.
+//  3. Wait for the user authorization.
+//  4. Receive a code via an authorization response (HTTP redirect).
+//  5. Exchange the code and a token.
+//  6. Return the code.
 func GetToken(ctx context.Context, c Config) (*oauth2.Token, error) {
 	if err := c.validateAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
