@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"path"
-	"strings"
 	"sync"
 	"time"
 
@@ -97,30 +95,26 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 }
 
 func computeRedirectURL(l net.Listener, c *Config) string {
-	hostPort := fmt.Sprintf("%s:%d", c.RedirectURLHostname, l.Addr().(*net.TCPAddr).Port)
-	u := &url.URL{
-		Scheme: "http",
-		Host:   hostPort,
-	}
+	port := l.Addr().(*net.TCPAddr).Port
+	scheme := "http"
 	if c.LocalServerCertFile != "" {
-		u.Scheme = "https"
+		scheme = "https"
 	}
+
+	isDefaultPort := false
+	if (scheme == "https" && port == 443) || (scheme == "http" && port == 80) {
+		isDefaultPort = true
+	}
+
+	u := fmt.Sprintf("%s://%s:%d", scheme, c.RedirectURLHostname, port)
+	if isDefaultPort {
+		u = fmt.Sprintf("%s://%s", scheme, c.RedirectURLHostname)
+	}
+
 	if c.RedirectURLPath != "" {
-		u.Path = path.Join(u.Path, c.RedirectURLPath)
+		u = u + path.Join("/", c.RedirectURLPath)
 	}
-
-	u, err := url.Parse(u.String())
-	if err != nil {
-		panic("could not parse the redirect URL: " + err.Error())
-	}
-	if u.Scheme == "https" && u.Port() == "443" {
-		u.Host = strings.Split(u.Host, ":")[0]
-	}
-	if u.Scheme == "http" && u.Port() == "80" {
-		u.Host = strings.Split(u.Host, ":")[0]
-	}
-
-	return u.String()
+	return u
 }
 
 type authorizationResponse struct {
@@ -140,6 +134,7 @@ func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.config.RedirectURLPath != "" {
 		redirectPath = h.config.RedirectURLPath
 	}
+	fmt.Println("r.URL.Path", r.URL.Path)
 	switch {
 	case r.Method == "GET" && r.URL.Path == redirectPath && q.Get("error") != "":
 		h.onceRespCh.Do(func() {
