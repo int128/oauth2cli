@@ -134,7 +134,7 @@ func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.config.RedirectURLPath != "" {
 		redirectPath = h.config.RedirectURLPath
 	}
-	fmt.Println("r.URL.Path", r.URL.Path)
+	
 	switch {
 	case r.Method == "GET" && r.URL.Path == redirectPath && q.Get("error") != "":
 		h.onceRespCh.Do(func() {
