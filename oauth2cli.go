@@ -138,13 +138,12 @@ func (c *Config) validateAndSetDefaults() error {
 //
 // This performs the following steps:
 //
-//	1. Start a local server at the port.
-//	2. Open a browser and navigate it to the local server.
-//	3. Wait for the user authorization.
-// 	4. Receive a code via an authorization response (HTTP redirect).
-// 	5. Exchange the code and a token.
-// 	6. Return the code.
-//
+//  1. Start a local server at the port.
+//  2. Open a browser and navigate it to the local server.
+//  3. Wait for the user authorization.
+//  4. Receive a code via an authorization response (HTTP redirect).
+//  5. Exchange the code and a token.
+//  6. Return the code.
 func GetToken(ctx context.Context, c Config) (*oauth2.Token, error) {
 	if err := c.validateAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
