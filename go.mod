@@ -5,7 +5,7 @@ require (
 	github.com/int128/listener v1.1.0
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
 	golang.org/x/oauth2 v0.8.0
-	golang.org/x/sync v0.1.0
+	golang.org/x/sync v0.2.0
 )
 
 go 1.13
