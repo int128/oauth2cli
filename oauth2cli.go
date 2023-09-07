@@ -4,10 +4,12 @@ package oauth2cli
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"github.com/int128/oauth2cli/oauth2params"
 	"net/http"
 
-	"github.com/int128/oauth2cli/oauth2params"
 	"golang.org/x/oauth2"
 )
 
@@ -94,6 +96,11 @@ type Config struct {
 	// Redirect URL upon failed login
 	FailureRedirectURL string
 
+	// Allow non-interactive login flows (headless machines without a browser available)
+	NonInteractive bool
+	// Instructions to print to stdout for non-interactive flows
+	NonInteractivePromptText string
+
 	// Logger function for debug.
 	Logf func(format string, args ...interface{})
 }
@@ -127,6 +134,9 @@ func (c *Config) validateAndSetDefaults() error {
 		(c.SuccessRedirectURL == "" && c.FailureRedirectURL != "") {
 		return fmt.Errorf("when using success and failure redirect URLs, set both URLs")
 	}
+	if c.NonInteractivePromptText == "" {
+		c.NonInteractivePromptText = "Please enter a valid authorization code flow code: "
+	}
 	if c.Logf == nil {
 		c.Logf = func(string, ...interface{}) {}
 	}
@@ -148,7 +158,23 @@ func GetToken(ctx context.Context, c Config) (*oauth2.Token, error) {
 	if err := c.validateAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	code, err := receiveCodeViaLocalServer(ctx, &c)
+	var code string
+	var err error
+
+	if c.NonInteractive {
+		var codeAndConfig *OAuth2ConfigAndCode
+		codeAndConfig, err = receiveCodeViaUserInput(&c)
+
+		if err != nil {
+			return nil, fmt.Errorf("error parsing user input: %w", err)
+		}
+
+		code = (*codeAndConfig).Code
+		c.OAuth2Config = (*codeAndConfig).OAuth2Config
+	} else {
+		code, err = receiveCodeViaLocalServer(ctx, &c)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("authorization error: %w", err)
 	}
@@ -158,4 +184,41 @@ func GetToken(ctx context.Context, c Config) (*oauth2.Token, error) {
 		return nil, fmt.Errorf("could not exchange the code and token: %w", err)
 	}
 	return token, nil
+}
+
+type OAuth2ConfigAndCode struct {
+	OAuth2Config oauth2.Config
+	Code         string
+}
+
+// GetCodeAndConfig cuts the authorization code flow in half. This allows for the
+// login process to be performed on headless machines that do not have access to a
+// browser by doing the interactive login on a machine that does have access to
+// a browser, and copying the result onto the headless machine.
+// The response of this function is a JSON that includes both the used
+// OAuth2Config and the authorization code, as a base64 encoded string.
+// This is the same string that receiveCodeViaUserInput expects
+func GetCodeAndConfig(ctx context.Context, c Config) (*string, error) {
+	if err := c.validateAndSetDefaults(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	code, err := receiveCodeViaLocalServer(ctx, &c)
+	if err != nil {
+		return nil, err
+	}
+
+	configAndCode := OAuth2ConfigAndCode{
+		OAuth2Config: c.OAuth2Config,
+		Code:         code,
+	}
+
+	bytes, unmarshalErr := json.Marshal(configAndCode)
+	jsonCodeAndConfig := base64.StdEncoding.EncodeToString(bytes)
+
+	if unmarshalErr != nil {
+		return nil, unmarshalErr
+	}
+
+	return &jsonCodeAndConfig, nil
 }
