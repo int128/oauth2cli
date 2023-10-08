@@ -71,32 +71,35 @@ func TestErrorAuthorizationResponse(t *testing.T) {
 func TestFailureRedirect(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
 	defer cancel()
+
+	// start a local server of oauth2 endpoint
+	authzServer := httptest.NewServer(&authserver.Handler{
+		T: t,
+		NewAuthorizationResponse: func(r authserver.AuthorizationRequest) string {
+			return fmt.Sprintf("%s?error=server_error", r.RedirectURI)
+		},
+		NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
+			return 500, "should not reach here"
+		},
+	})
+	defer authzServer.Close()
+
+	// start a local server to be redirected
+	pageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/failure" && r.Method == "GET" {
+			_, _ = w.Write([]byte("failure page"))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer pageServer.Close()
+
 	openBrowserCh := make(chan string)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(openBrowserCh)
-		// start a local server of oauth2 endpoint
-		s := httptest.NewServer(&authserver.Handler{
-			T: t,
-			NewAuthorizationResponse: func(r authserver.AuthorizationRequest) string {
-				return fmt.Sprintf("%s?error=server_error", r.RedirectURI)
-			},
-			NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
-				return 500, "should not reach here"
-			},
-		})
-		defer s.Close()
-		// start a local server to be redirected
-		sr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/failure" && r.Method == "GET" {
-				_, _ = w.Write([]byte("failure page"))
-				return
-			}
-			http.NotFound(w, r)
-		}))
-		defer sr.Close()
 		// get a token
 		cfg := oauth2cli.Config{
 			OAuth2Config: oauth2.Config{
@@ -104,13 +107,13 @@ func TestFailureRedirect(t *testing.T) {
 				ClientSecret: "YOUR_CLIENT_SECRET",
 				Scopes:       []string{"email", "profile"},
 				Endpoint: oauth2.Endpoint{
-					AuthURL:  s.URL + "/auth",
-					TokenURL: s.URL + "/token",
+					AuthURL:  authzServer.URL + "/auth",
+					TokenURL: authzServer.URL + "/token",
 				},
 			},
 			LocalServerReadyChan: openBrowserCh,
-			SuccessRedirectURL:   sr.URL + "/success",
-			FailureRedirectURL:   sr.URL + "/failure",
+			SuccessRedirectURL:   pageServer.URL + "/success",
+			FailureRedirectURL:   pageServer.URL + "/failure",
 			Logf:                 t.Logf,
 		}
 		_, err := oauth2cli.GetToken(ctx, cfg)
