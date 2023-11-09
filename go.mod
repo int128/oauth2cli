@@ -4,7 +4,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/int128/listener v1.1.0
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
-	golang.org/x/oauth2 v0.13.0
+	golang.org/x/oauth2 v0.14.0
 	golang.org/x/sync v0.5.0
 )
 
