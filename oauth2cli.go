@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/int128/oauth2cli/oauth2params"
 	"golang.org/x/oauth2"
+
+	"github.com/int128/oauth2cli/oauth2params"
 )
 
 var noopMiddleware = func(h http.Handler) http.Handler { return h }
@@ -56,6 +57,9 @@ type Config struct {
 	// You can set this if your provider does not accept localhost.
 	// Default to localhost.
 	RedirectURLHostname string
+	// RedirectURLPath is the path of the redirect URL.
+	// Default to /.
+	RedirectURLPath string
 	// Options for an authorization request.
 	// You can set oauth2.AccessTypeOffline and the PKCE options here.
 	AuthCodeOptions []oauth2.AuthCodeOption
