@@ -4,8 +4,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -14,7 +15,7 @@ import (
 var certPool = x509.NewCertPool()
 
 func init() {
-	data, err := ioutil.ReadFile("testdata/ca.crt")
+	data, err := os.ReadFile("testdata/ca.crt")
 	if err != nil {
 		panic(err)
 	}
@@ -30,7 +31,7 @@ func Get(url string) (int, string, error) {
 		return 0, "", fmt.Errorf("could not send a request: %w", err)
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return resp.StatusCode, "", fmt.Errorf("could not read response body: %w", err)
 	}
