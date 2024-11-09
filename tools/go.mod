@@ -2,7 +2,7 @@ module github.com/int128/oauth2cli/tools
 
 go 1.23.3
 
-require github.com/golangci/golangci-lint v1.61.0
+require github.com/golangci/golangci-lint v1.59.1
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect
