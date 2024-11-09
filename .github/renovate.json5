@@ -10,7 +10,7 @@
     {
       "description": "Update go version",
       "matchDatasources": ["golang-version"],
-      "rangeStrategy": "bump"
+      "rangeStrategy": "bump",
     },
     {
       "description": "Do not update go directive in go.mod",
@@ -19,5 +19,5 @@
       "matchFileNames": ["go.mod"],
       "enabled": false,
     },
-  ]
+  ],
 }
