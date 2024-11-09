@@ -5,12 +5,14 @@ on:
     paths:
       - .github/workflows/go.yaml
       - '**/*.go'
-      - go.*
+      - '**/go.*'
+      - Makefile
   push:
     paths:
       - .github/workflows/go.yaml
       - '**/*.go'
-      - go.*
+      - '**/go.*'
+      - Makefile
     branches:
       - master
 
