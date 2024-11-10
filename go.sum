@@ -3,8 +3,8 @@ cloud.google.com/go/compute/metadata v0.3.0/go.mod h1:zFmK7XCadkQkj6TtorcaGlCW1h
 github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/int128/listener v1.1.0 h1:2Jb41DWLpkQ3I9bIdBzO8H/tNwMvyl/OBZWtCV5Pjuw=
-github.com/int128/listener v1.1.0/go.mod h1:68WkmTN8PQtLzc9DucIaagAKeGVyMnyyKIkW4Xn47UA=
+github.com/int128/listener v1.2.0 h1:Gj+wLX1mCfetZWJz0wi7343JuP8qGrYcbavNQR2xye4=
+github.com/int128/listener v1.2.0/go.mod h1:k2nhHj+0PLFQ9VD15FnRubK8iJ5t9cif15HwhQ8Liok=
 github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c h1:+mdjkGKdHQG3305AYmdv1U2eRNDiU2ErMBj1gwrq8eQ=
 github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c/go.mod h1:7rwL4CYBLnjLxUqIJNnCWiEdr3bn6IUYi15bNlnbCCU=
 golang.org/x/oauth2 v0.24.0 h1:KTBBxWqUa0ykRPLtV69rRto9TLXcqYkeswu48x/gvNE=
