@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path"
 	"sync"
 	"time"
 
@@ -94,11 +95,26 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 }
 
 func computeRedirectURL(l net.Listener, c *Config) string {
-	hostPort := fmt.Sprintf("%s:%d", c.RedirectURLHostname, l.Addr().(*net.TCPAddr).Port)
+	port := l.Addr().(*net.TCPAddr).Port
+	scheme := "http"
 	if c.LocalServerCertFile != "" {
-		return "https://" + hostPort
+		scheme = "https"
 	}
-	return "http://" + hostPort
+
+	isDefaultPort := false
+	if (scheme == "https" && port == 443) || (scheme == "http" && port == 80) {
+		isDefaultPort = true
+	}
+
+	u := fmt.Sprintf("%s://%s:%d", scheme, c.RedirectURLHostname, port)
+	if isDefaultPort {
+		u = fmt.Sprintf("%s://%s", scheme, c.RedirectURLHostname)
+	}
+
+	if c.RedirectURLPath != "" {
+		u = u + path.Join("/", c.RedirectURLPath)
+	}
+	return u
 }
 
 type authorizationResponse struct {
@@ -114,16 +130,21 @@ type localServerHandler struct {
 
 func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	redirectPath := "/"
+	if h.config.RedirectURLPath != "" {
+		redirectPath = h.config.RedirectURLPath
+	}
+	
 	switch {
-	case r.Method == "GET" && r.URL.Path == "/" && q.Get("error") != "":
+	case r.Method == "GET" && r.URL.Path == redirectPath && q.Get("error") != "":
 		h.onceRespCh.Do(func() {
 			h.respCh <- h.handleErrorResponse(w, r)
 		})
-	case r.Method == "GET" && r.URL.Path == "/" && q.Get("code") != "":
+	case r.Method == "GET" && r.URL.Path == redirectPath && q.Get("code") != "":
 		h.onceRespCh.Do(func() {
 			h.respCh <- h.handleCodeResponse(w, r)
 		})
-	case r.Method == "GET" && r.URL.Path == "/":
+	case r.Method == "GET" && r.URL.Path == redirectPath:
 		h.handleIndex(w, r)
 	default:
 		http.NotFound(w, r)
