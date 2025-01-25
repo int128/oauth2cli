@@ -25,24 +25,24 @@ func TestErrorAuthorizationResponse(t *testing.T) {
 		defer wg.Done()
 		defer close(openBrowserCh)
 		// Start a local server and get a token.
-		s := httptest.NewServer(&authserver.Handler{
-			T: t,
-			NewAuthorizationResponse: func(r authserver.AuthorizationRequest) string {
-				return fmt.Sprintf("%s?error=server_error", r.RedirectURI)
+		testServer := httptest.NewServer(&authserver.Handler{
+			TestingT: t,
+			NewAuthorizationResponse: func(req authserver.AuthorizationRequest) string {
+				return fmt.Sprintf("%s?error=server_error", req.RedirectURI)
 			},
-			NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
+			NewTokenResponse: func(req authserver.TokenRequest) (int, string) {
 				return 500, "should not reach here"
 			},
 		})
-		defer s.Close()
+		defer testServer.Close()
 		cfg := oauth2cli.Config{
 			OAuth2Config: oauth2.Config{
 				ClientID:     "YOUR_CLIENT_ID",
 				ClientSecret: "YOUR_CLIENT_SECRET",
 				Scopes:       []string{"email", "profile"},
 				Endpoint: oauth2.Endpoint{
-					AuthURL:  s.URL + "/auth",
-					TokenURL: s.URL + "/token",
+					AuthURL:  testServer.URL + "/auth",
+					TokenURL: testServer.URL + "/token",
 				},
 			},
 			LocalServerReadyChan: openBrowserCh,
@@ -74,11 +74,11 @@ func TestFailureRedirect(t *testing.T) {
 
 	// start a local server of oauth2 endpoint
 	authzServer := httptest.NewServer(&authserver.Handler{
-		T: t,
-		NewAuthorizationResponse: func(r authserver.AuthorizationRequest) string {
-			return fmt.Sprintf("%s?error=server_error", r.RedirectURI)
+		TestingT: t,
+		NewAuthorizationResponse: func(req authserver.AuthorizationRequest) string {
+			return fmt.Sprintf("%s?error=server_error", req.RedirectURI)
 		},
-		NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
+		NewTokenResponse: func(req authserver.TokenRequest) (int, string) {
 			return 500, "should not reach here"
 		},
 	})
@@ -146,24 +146,24 @@ func TestErrorTokenResponse(t *testing.T) {
 		defer wg.Done()
 		defer close(openBrowserCh)
 		// Start a local server and get a token.
-		s := httptest.NewServer(&authserver.Handler{
-			T: t,
-			NewAuthorizationResponse: func(r authserver.AuthorizationRequest) string {
-				return fmt.Sprintf("%s?state=%s&code=%s", r.RedirectURI, r.State, "AUTH_CODE")
+		testServer := httptest.NewServer(&authserver.Handler{
+			TestingT: t,
+			NewAuthorizationResponse: func(req authserver.AuthorizationRequest) string {
+				return fmt.Sprintf("%s?state=%s&code=%s", req.RedirectURI, req.State, "AUTH_CODE")
 			},
-			NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
+			NewTokenResponse: func(req authserver.TokenRequest) (int, string) {
 				return 400, `{"error":"invalid_request"}`
 			},
 		})
-		defer s.Close()
+		defer testServer.Close()
 		cfg := oauth2cli.Config{
 			OAuth2Config: oauth2.Config{
 				ClientID:     "YOUR_CLIENT_ID",
 				ClientSecret: "YOUR_CLIENT_SECRET",
 				Scopes:       []string{"email", "profile"},
 				Endpoint: oauth2.Endpoint{
-					AuthURL:  s.URL + "/auth",
-					TokenURL: s.URL + "/token",
+					AuthURL:  testServer.URL + "/auth",
+					TokenURL: testServer.URL + "/token",
 				},
 			},
 			LocalServerReadyChan: openBrowserCh,
