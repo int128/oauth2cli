@@ -1,6 +1,6 @@
 module github.com/int128/oauth2cli
 
-go 1.13
+go 1.18
 
 toolchain go1.23.5
 
@@ -10,4 +10,9 @@ require (
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	golang.org/x/oauth2 v0.25.0
 	golang.org/x/sync v0.10.0
+)
+
+require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
+	golang.org/x/sys v0.1.0 // indirect
 )
