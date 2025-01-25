@@ -14,7 +14,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func TestTLS(t *testing.T) {
+func TestLocalServerCallbackPath(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Second)
 	defer cancel()
 	openBrowserCh := make(chan string)
@@ -31,7 +31,7 @@ func TestTLS(t *testing.T) {
 					t.Errorf("scope wants %s but %s", want, req.Scope)
 					return fmt.Sprintf("%s?error=invalid_scope", req.RedirectURI)
 				}
-				if !assertRedirectURI(t, req.RedirectURI, "https", "localhost", "/") {
+				if !assertRedirectURI(t, req.RedirectURI, "http", "localhost", "/callback") {
 					return fmt.Sprintf("%s?error=invalid_redirect_uri", req.RedirectURI)
 				}
 				return fmt.Sprintf("%s?state=%s&code=%s", req.RedirectURI, req.State, "AUTH_CODE")
@@ -55,11 +55,10 @@ func TestTLS(t *testing.T) {
 					TokenURL: testServer.URL + "/token",
 				},
 			},
-			LocalServerCertFile:   "testdata/server.crt",
-			LocalServerKeyFile:    "testdata/server.key",
-			LocalServerReadyChan:  openBrowserCh,
-			LocalServerMiddleware: loggingMiddleware(t),
-			Logf:                  t.Logf,
+			LocalServerCallbackPath: "/callback",
+			LocalServerReadyChan:    openBrowserCh,
+			LocalServerMiddleware:   loggingMiddleware(t),
+			Logf:                    t.Logf,
 		}
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {

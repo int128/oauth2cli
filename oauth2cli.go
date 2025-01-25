@@ -83,6 +83,11 @@ type Config struct {
 	// This is required when LocalServerCertFile is set.
 	LocalServerKeyFile string
 
+	// Callback path of the local server.
+	// If your provider requires a specific path of the redirect URL, set it here.
+	// Default to "/".
+	LocalServerCallbackPath string
+
 	// Response HTML body on authorization completed.
 	// Default to DefaultLocalServerSuccessHTML.
 	LocalServerSuccessHTML string
@@ -118,6 +123,9 @@ func (cfg *Config) validateAndSetDefaults() error {
 			return fmt.Errorf("could not generate a state parameter: %w", err)
 		}
 		cfg.State = state
+	}
+	if cfg.LocalServerCallbackPath == "" {
+		cfg.LocalServerCallbackPath = "/"
 	}
 	if cfg.LocalServerMiddleware == nil {
 		cfg.LocalServerMiddleware = noopMiddleware
