@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -25,37 +24,35 @@ func TestTLS(t *testing.T) {
 		defer wg.Done()
 		defer close(openBrowserCh)
 		// Start a local server and get a token.
-		s := httptest.NewServer(&authserver.Handler{
-			T: t,
-			NewAuthorizationResponse: func(r authserver.AuthorizationRequest) string {
-				if w := "email profile"; r.Scope != w {
-					t.Errorf("scope wants %s but %s", w, r.Scope)
-					return fmt.Sprintf("%s?error=invalid_scope", r.RedirectURI)
+		testServer := httptest.NewServer(&authserver.Handler{
+			TestingT: t,
+			NewAuthorizationResponse: func(req authserver.AuthorizationRequest) string {
+				if want := "email profile"; req.Scope != want {
+					t.Errorf("scope wants %s but %s", want, req.Scope)
+					return fmt.Sprintf("%s?error=invalid_scope", req.RedirectURI)
 				}
-				redirectURIPrefix := "https://localhost:"
-				if !strings.HasPrefix(r.RedirectURI, redirectURIPrefix) {
-					t.Errorf("redirect_uri wants prefix %s but was %s", redirectURIPrefix, r.RedirectURI)
-					return fmt.Sprintf("%s?error=invalid_redirect_uri", r.RedirectURI)
+				if !assertRedirectURI(t, req.RedirectURI, "https", "localhost") {
+					return fmt.Sprintf("%s?error=invalid_redirect_uri", req.RedirectURI)
 				}
-				return fmt.Sprintf("%s?state=%s&code=%s", r.RedirectURI, r.State, "AUTH_CODE")
+				return fmt.Sprintf("%s?state=%s&code=%s", req.RedirectURI, req.State, "AUTH_CODE")
 			},
-			NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
-				if w := "AUTH_CODE"; r.Code != w {
-					t.Errorf("code wants %s but %s", w, r.Code)
+			NewTokenResponse: func(req authserver.TokenRequest) (int, string) {
+				if want := "AUTH_CODE"; req.Code != want {
+					t.Errorf("code wants %s but %s", want, req.Code)
 					return 400, invalidGrantResponse
 				}
 				return 200, validTokenResponse
 			},
 		})
-		defer s.Close()
+		defer testServer.Close()
 		cfg := oauth2cli.Config{
 			OAuth2Config: oauth2.Config{
 				ClientID:     "YOUR_CLIENT_ID",
 				ClientSecret: "YOUR_CLIENT_SECRET",
 				Scopes:       []string{"email", "profile"},
 				Endpoint: oauth2.Endpoint{
-					AuthURL:  s.URL + "/auth",
-					TokenURL: s.URL + "/token",
+					AuthURL:  testServer.URL + "/auth",
+					TokenURL: testServer.URL + "/token",
 				},
 			},
 			LocalServerCertFile:   "testdata/server.crt",
@@ -69,11 +66,11 @@ func TestTLS(t *testing.T) {
 			t.Errorf("could not get a token: %s", err)
 			return
 		}
-		if "ACCESS_TOKEN" != token.AccessToken {
+		if token.AccessToken != "ACCESS_TOKEN" {
 			t.Errorf("AccessToken wants %s but %s", "ACCESS_TOKEN", token.AccessToken)
 		}
-		if "REFRESH_TOKEN" != token.RefreshToken {
-			t.Errorf("RefreshToken wants %s but %s", "REFRESH_TOKEN", token.AccessToken)
+		if token.RefreshToken != "REFRESH_TOKEN" {
+			t.Errorf("RefreshToken wants %s but %s", "REFRESH_TOKEN", token.RefreshToken)
 		}
 	}()
 	wg.Add(1)
