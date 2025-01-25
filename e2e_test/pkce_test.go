@@ -27,41 +27,44 @@ func TestPKCE(t *testing.T) {
 		const codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
 		const codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 		// Start a local server and get a token.
-		s := httptest.NewServer(&authserver.Handler{
-			T: t,
-			NewAuthorizationResponse: func(r authserver.AuthorizationRequest) string {
-				if r.Raw.Get("code_challenge_method") != "S256" {
-					t.Errorf("code_challenge_method wants S256 but was %s", r.Raw.Get("code_challenge_method"))
+		testServer := httptest.NewServer(&authserver.Handler{
+			TestingT: t,
+			NewAuthorizationResponse: func(req authserver.AuthorizationRequest) string {
+				if req.Raw.Get("code_challenge_method") != "S256" {
+					t.Errorf("code_challenge_method wants S256 but was %s", req.Raw.Get("code_challenge_method"))
 				}
-				if r.Raw.Get("code_challenge") != codeChallenge {
-					t.Errorf("code_challenge wants %s but was %s", codeChallenge, r.Raw.Get("code_challenge"))
+				if req.Raw.Get("code_challenge") != codeChallenge {
+					t.Errorf("code_challenge wants %s but was %s", codeChallenge, req.Raw.Get("code_challenge"))
 				}
-				if w := "email profile"; r.Scope != w {
-					t.Errorf("scope wants %s but %s", w, r.Scope)
-					return fmt.Sprintf("%s?error=invalid_scope", r.RedirectURI)
+				if want := "email profile"; req.Scope != want {
+					t.Errorf("scope wants %s but %s", want, req.Scope)
+					return fmt.Sprintf("%s?error=invalid_scope", req.RedirectURI)
 				}
-				return fmt.Sprintf("%s?state=%s&code=%s", r.RedirectURI, r.State, "AUTH_CODE")
+				if !assertRedirectURI(t, req.RedirectURI, "http", "localhost") {
+					return fmt.Sprintf("%s?error=invalid_redirect_uri", req.RedirectURI)
+				}
+				return fmt.Sprintf("%s?state=%s&code=%s", req.RedirectURI, req.State, "AUTH_CODE")
 			},
-			NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
-				if r.Raw.Get("code_verifier") != codeVerifier {
-					t.Errorf("code_verifier wants %s but was %s", codeVerifier, r.Raw.Get("code_verifier"))
+			NewTokenResponse: func(req authserver.TokenRequest) (int, string) {
+				if req.Raw.Get("code_verifier") != codeVerifier {
+					t.Errorf("code_verifier wants %s but was %s", codeVerifier, req.Raw.Get("code_verifier"))
 				}
-				if w := "AUTH_CODE"; r.Code != w {
-					t.Errorf("code wants %s but %s", w, r.Code)
+				if want := "AUTH_CODE"; req.Code != want {
+					t.Errorf("code wants %s but %s", want, req.Code)
 					return 400, invalidGrantResponse
 				}
 				return 200, validTokenResponse
 			},
 		})
-		defer s.Close()
+		defer testServer.Close()
 		cfg := oauth2cli.Config{
 			OAuth2Config: oauth2.Config{
 				ClientID:     "YOUR_CLIENT_ID",
 				ClientSecret: "YOUR_CLIENT_SECRET",
 				Scopes:       []string{"email", "profile"},
 				Endpoint: oauth2.Endpoint{
-					AuthURL:  s.URL + "/auth",
-					TokenURL: s.URL + "/token",
+					AuthURL:  testServer.URL + "/auth",
+					TokenURL: testServer.URL + "/token",
 				},
 			},
 			AuthCodeOptions: []oauth2.AuthCodeOption{
@@ -80,11 +83,11 @@ func TestPKCE(t *testing.T) {
 			t.Errorf("could not get a token: %s", err)
 			return
 		}
-		if "ACCESS_TOKEN" != token.AccessToken {
+		if token.AccessToken != "ACCESS_TOKEN" {
 			t.Errorf("AccessToken wants %s but %s", "ACCESS_TOKEN", token.AccessToken)
 		}
-		if "REFRESH_TOKEN" != token.RefreshToken {
-			t.Errorf("RefreshToken wants %s but %s", "REFRESH_TOKEN", token.AccessToken)
+		if token.RefreshToken != "REFRESH_TOKEN" {
+			t.Errorf("RefreshToken wants %s but %s", "REFRESH_TOKEN", token.RefreshToken)
 		}
 	}()
 	wg.Add(1)

@@ -16,24 +16,24 @@ import (
 func TestContextCancelOnWaitingForBrowser(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 100*time.Millisecond)
 	defer cancel()
-	s := httptest.NewServer(&authserver.Handler{
-		T: t,
-		NewAuthorizationResponse: func(r authserver.AuthorizationRequest) string {
-			return fmt.Sprintf("%s?error=server_error", r.RedirectURI)
+	testServer := httptest.NewServer(&authserver.Handler{
+		TestingT: t,
+		NewAuthorizationResponse: func(req authserver.AuthorizationRequest) string {
+			return fmt.Sprintf("%s?error=server_error", req.RedirectURI)
 		},
-		NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
+		NewTokenResponse: func(req authserver.TokenRequest) (int, string) {
 			return 500, "should not reach here"
 		},
 	})
-	defer s.Close()
+	defer testServer.Close()
 	cfg := oauth2cli.Config{
 		OAuth2Config: oauth2.Config{
 			ClientID:     "YOUR_CLIENT_ID",
 			ClientSecret: "YOUR_CLIENT_SECRET",
 			Scopes:       []string{"email", "profile"},
 			Endpoint: oauth2.Endpoint{
-				AuthURL:  s.URL + "/auth",
-				TokenURL: s.URL + "/token",
+				AuthURL:  testServer.URL + "/auth",
+				TokenURL: testServer.URL + "/token",
 			},
 		},
 		Logf: t.Logf,
@@ -53,24 +53,24 @@ func TestContextCancelOnLocalServerReadyChan(t *testing.T) {
 	defer cancel()
 	openBrowserCh := make(chan string)
 	defer close(openBrowserCh)
-	s := httptest.NewServer(&authserver.Handler{
-		T: t,
-		NewAuthorizationResponse: func(r authserver.AuthorizationRequest) string {
-			return fmt.Sprintf("%s?error=server_error", r.RedirectURI)
+	testServer := httptest.NewServer(&authserver.Handler{
+		TestingT: t,
+		NewAuthorizationResponse: func(req authserver.AuthorizationRequest) string {
+			return fmt.Sprintf("%s?error=server_error", req.RedirectURI)
 		},
-		NewTokenResponse: func(r authserver.TokenRequest) (int, string) {
+		NewTokenResponse: func(req authserver.TokenRequest) (int, string) {
 			return 500, "should not reach here"
 		},
 	})
-	defer s.Close()
+	defer testServer.Close()
 	cfg := oauth2cli.Config{
 		OAuth2Config: oauth2.Config{
 			ClientID:     "YOUR_CLIENT_ID",
 			ClientSecret: "YOUR_CLIENT_SECRET",
 			Scopes:       []string{"email", "profile"},
 			Endpoint: oauth2.Endpoint{
-				AuthURL:  s.URL + "/auth",
-				TokenURL: s.URL + "/token",
+				AuthURL:  testServer.URL + "/auth",
+				TokenURL: testServer.URL + "/token",
 			},
 		},
 		LocalServerReadyChan: openBrowserCh,
