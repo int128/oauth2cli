@@ -33,19 +33,19 @@ type Handler struct {
 
 	// This should return a URL with query parameters of authorization response.
 	// See https://tools.ietf.org/html/rfc6749#section-4.1.2
-	NewAuthorizationResponse func(r AuthorizationRequest) string
+	NewAuthorizationResponse func(req AuthorizationRequest) string
 
 	// This should return a JSON body of access token response or error response.
 	// See https://tools.ietf.org/html/rfc6749#section-5.1
 	// and https://tools.ietf.org/html/rfc6749#section-5.2
-	NewTokenResponse func(r TokenRequest) (int, string)
+	NewTokenResponse func(req TokenRequest) (int, string)
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.TestingT.Logf("authServer: %s %s", r.Method, r.RequestURI)
 	if err := h.serveHTTP(w, r); err != nil {
 		h.TestingT.Errorf("Handler error: %s", err)
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -63,13 +63,13 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request) error {
 		if redirectURI == "" {
 			return errors.New("redirect_uri is missing")
 		}
-		to := h.NewAuthorizationResponse(AuthorizationRequest{
+		authorizationResponseURL := h.NewAuthorizationResponse(AuthorizationRequest{
 			Scope:       scope,
 			State:       state,
 			RedirectURI: redirectURI,
 			Raw:         q,
 		})
-		http.Redirect(w, r, to, http.StatusFound)
+		http.Redirect(w, r, authorizationResponseURL, http.StatusFound)
 
 	case r.Method == "POST" && r.URL.Path == "/token":
 		if err := r.ParseForm(); err != nil {
