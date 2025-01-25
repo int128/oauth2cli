@@ -155,21 +155,20 @@ func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.R
 
 	if h.config.SuccessRedirectURL != "" {
 		http.Redirect(w, r, h.config.SuccessRedirectURL, http.StatusFound)
-	} else {
-		w.Header().Add("Content-Type", "text/html")
-		if _, err := fmt.Fprint(w, h.config.LocalServerSuccessHTML); err != nil {
-			http.Error(w, "server error", 500)
-			return &authorizationResponse{err: fmt.Errorf("write error: %w", err)}
-		}
+		return &authorizationResponse{code: code}
 	}
 
+	w.Header().Add("Content-Type", "text/html")
+	if _, err := fmt.Fprint(w, h.config.LocalServerSuccessHTML); err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return &authorizationResponse{err: fmt.Errorf("write error: %w", err)}
+	}
 	return &authorizationResponse{code: code}
 }
 
 func (h *localServerHandler) handleErrorResponse(w http.ResponseWriter, r *http.Request) *authorizationResponse {
 	q := r.URL.Query()
 	errorCode, errorDescription := q.Get("error"), q.Get("error_description")
-
 	h.authorizationError(w, r)
 	return &authorizationResponse{err: fmt.Errorf("authorization error from server: %s %s", errorCode, errorDescription)}
 }
@@ -178,6 +177,6 @@ func (h *localServerHandler) authorizationError(w http.ResponseWriter, r *http.R
 	if h.config.FailureRedirectURL != "" {
 		http.Redirect(w, r, h.config.FailureRedirectURL, http.StatusFound)
 	} else {
-		http.Error(w, "authorization error", 500)
+		http.Error(w, "Authorization error", http.StatusInternalServerError)
 	}
 }

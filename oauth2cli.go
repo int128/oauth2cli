@@ -113,11 +113,11 @@ func (cfg *Config) validateAndSetDefaults() error {
 		cfg.RedirectURLHostname = "localhost"
 	}
 	if cfg.State == "" {
-		s, err := oauth2params.NewState()
+		state, err := oauth2params.NewState()
 		if err != nil {
 			return fmt.Errorf("could not generate a state parameter: %w", err)
 		}
-		cfg.State = s
+		cfg.State = state
 	}
 	if cfg.LocalServerMiddleware == nil {
 		cfg.LocalServerMiddleware = noopMiddleware
