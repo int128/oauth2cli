@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -13,18 +14,20 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
-	l, err := listener.New(c.LocalServerBindAddress)
+func receiveCodeViaLocalServer(ctx context.Context, cfg *Config) (string, error) {
+	localServerListener, err := listener.New(cfg.LocalServerBindAddress)
 	if err != nil {
 		return "", fmt.Errorf("could not start a local server: %w", err)
 	}
-	defer l.Close()
-	c.OAuth2Config.RedirectURL = computeRedirectURL(l, c)
+	defer localServerListener.Close()
+
+	localServerPort := localServerListener.Addr().(*net.TCPAddr).Port
+	cfg.OAuth2Config.RedirectURL = constructRedirectURL(cfg, localServerPort)
 
 	respCh := make(chan *authorizationResponse)
 	server := http.Server{
-		Handler: c.LocalServerMiddleware(&localServerHandler{
-			config: c,
+		Handler: cfg.LocalServerMiddleware(&localServerHandler{
+			config: cfg,
 			respCh: respCh,
 		}),
 	}
@@ -33,15 +36,18 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	var eg errgroup.Group
 	eg.Go(func() error {
 		defer close(respCh)
-		c.Logf("oauth2cli: starting a server at %s", l.Addr())
-		defer c.Logf("oauth2cli: stopped the server")
-		if c.isLocalServerHTTPS() {
-			if err := server.ServeTLS(l, c.LocalServerCertFile, c.LocalServerKeyFile); err != nil && err != http.ErrServerClosed {
+		cfg.Logf("oauth2cli: starting a server at %s", localServerListener.Addr())
+		defer cfg.Logf("oauth2cli: stopped the server")
+		if cfg.isLocalServerHTTPS() {
+			if err := server.ServeTLS(localServerListener, cfg.LocalServerCertFile, cfg.LocalServerKeyFile); err != nil {
+				if errors.Is(err, http.ErrServerClosed) {
+					return nil
+				}
 				return fmt.Errorf("could not start HTTPS server: %w", err)
 			}
 			return nil
 		}
-		if err := server.Serve(l); err != nil && err != http.ErrServerClosed {
+		if err := server.Serve(localServerListener); err != nil && err != http.ErrServerClosed {
 			return fmt.Errorf("could not start HTTP server: %w", err)
 		}
 		return nil
@@ -63,22 +69,22 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 		// Gracefully shutdown the server in the timeout.
 		// If the server has not started, Shutdown returns nil and this returns immediately.
 		// If Shutdown has failed, force-close the server.
-		c.Logf("oauth2cli: shutting down the server")
+		cfg.Logf("oauth2cli: shutting down the server")
 		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			c.Logf("oauth2cli: force-closing the server: shutdown failed: %s", err)
+			cfg.Logf("oauth2cli: force-closing the server: shutdown failed: %s", err)
 			_ = server.Close()
 			return nil
 		}
 		return nil
 	})
 	eg.Go(func() error {
-		if c.LocalServerReadyChan == nil {
+		if cfg.LocalServerReadyChan == nil {
 			return nil
 		}
 		select {
-		case c.LocalServerReadyChan <- c.OAuth2Config.RedirectURL:
+		case cfg.LocalServerReadyChan <- cfg.OAuth2Config.RedirectURL:
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
@@ -93,12 +99,14 @@ func receiveCodeViaLocalServer(ctx context.Context, c *Config) (string, error) {
 	return resp.code, resp.err
 }
 
-func computeRedirectURL(l net.Listener, c *Config) string {
-	hostPort := fmt.Sprintf("%s:%d", c.RedirectURLHostname, l.Addr().(*net.TCPAddr).Port)
-	if c.LocalServerCertFile != "" {
-		return "https://" + hostPort
+func constructRedirectURL(cfg *Config, port int) string {
+	var redirect url.URL
+	redirect.Host = fmt.Sprintf("%s:%d", cfg.RedirectURLHostname, port)
+	redirect.Scheme = "http"
+	if cfg.isLocalServerHTTPS() {
+		redirect.Scheme = "https"
 	}
-	return "http://" + hostPort
+	return redirect.String()
 }
 
 type authorizationResponse struct {
@@ -133,7 +141,7 @@ func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *localServerHandler) handleIndex(w http.ResponseWriter, r *http.Request) {
 	authCodeURL := h.config.OAuth2Config.AuthCodeURL(h.config.State, h.config.AuthCodeOptions...)
 	h.config.Logf("oauth2cli: sending redirect to %s", authCodeURL)
-	http.Redirect(w, r, authCodeURL, 302)
+	http.Redirect(w, r, authCodeURL, http.StatusFound)
 }
 
 func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.Request) *authorizationResponse {
@@ -147,21 +155,20 @@ func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.R
 
 	if h.config.SuccessRedirectURL != "" {
 		http.Redirect(w, r, h.config.SuccessRedirectURL, http.StatusFound)
-	} else {
-		w.Header().Add("Content-Type", "text/html")
-		if _, err := fmt.Fprint(w, h.config.LocalServerSuccessHTML); err != nil {
-			http.Error(w, "server error", 500)
-			return &authorizationResponse{err: fmt.Errorf("write error: %w", err)}
-		}
+		return &authorizationResponse{code: code}
 	}
 
+	w.Header().Add("Content-Type", "text/html")
+	if _, err := fmt.Fprint(w, h.config.LocalServerSuccessHTML); err != nil {
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return &authorizationResponse{err: fmt.Errorf("write error: %w", err)}
+	}
 	return &authorizationResponse{code: code}
 }
 
 func (h *localServerHandler) handleErrorResponse(w http.ResponseWriter, r *http.Request) *authorizationResponse {
 	q := r.URL.Query()
 	errorCode, errorDescription := q.Get("error"), q.Get("error_description")
-
 	h.authorizationError(w, r)
 	return &authorizationResponse{err: fmt.Errorf("authorization error from server: %s %s", errorCode, errorDescription)}
 }
@@ -170,6 +177,6 @@ func (h *localServerHandler) authorizationError(w http.ResponseWriter, r *http.R
 	if h.config.FailureRedirectURL != "" {
 		http.Redirect(w, r, h.config.FailureRedirectURL, http.StatusFound)
 	} else {
-		http.Error(w, "authorization error", 500)
+		http.Error(w, "authorization error", http.StatusInternalServerError)
 	}
 }
