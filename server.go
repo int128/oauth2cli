@@ -160,7 +160,7 @@ func (h *localServerHandler) handleCodeResponse(w http.ResponseWriter, r *http.R
 
 	w.Header().Add("Content-Type", "text/html")
 	if _, err := fmt.Fprint(w, h.config.LocalServerSuccessHTML); err != nil {
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		http.Error(w, "server error", http.StatusInternalServerError)
 		return &authorizationResponse{err: fmt.Errorf("write error: %w", err)}
 	}
 	return &authorizationResponse{code: code}
@@ -177,6 +177,6 @@ func (h *localServerHandler) authorizationError(w http.ResponseWriter, r *http.R
 	if h.config.FailureRedirectURL != "" {
 		http.Redirect(w, r, h.config.FailureRedirectURL, http.StatusFound)
 	} else {
-		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		http.Error(w, "authorization error", http.StatusInternalServerError)
 	}
 }
