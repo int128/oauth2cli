@@ -36,7 +36,7 @@ func TestHappyPath(t *testing.T) {
 					t.Errorf("scope wants %s but %s", want, req.Scope)
 					return fmt.Sprintf("%s?error=invalid_scope", req.RedirectURI)
 				}
-				if !assertRedirectURI(t, req.RedirectURI, "http", "localhost") {
+				if !assertRedirectURI(t, req.RedirectURI, "http", "localhost", "/") {
 					return fmt.Sprintf("%s?error=invalid_redirect_uri", req.RedirectURI)
 				}
 				return fmt.Sprintf("%s?state=%s&code=%s", req.RedirectURI, req.State, "AUTH_CODE")
@@ -106,7 +106,7 @@ func TestRedirectURLHostname(t *testing.T) {
 					t.Errorf("scope wants %s but %s", want, req.Scope)
 					return fmt.Sprintf("%s?error=invalid_scope", req.RedirectURI)
 				}
-				if !assertRedirectURI(t, req.RedirectURI, "http", "127.0.0.1") {
+				if !assertRedirectURI(t, req.RedirectURI, "http", "127.0.0.1", "/") {
 					return fmt.Sprintf("%s?error=invalid_redirect_uri", req.RedirectURI)
 				}
 				return fmt.Sprintf("%s?state=%s&code=%s", req.RedirectURI, req.State, "AUTH_CODE")
@@ -177,7 +177,7 @@ func TestSuccessRedirect(t *testing.T) {
 					t.Errorf("scope wants %s but %s", want, req.Scope)
 					return fmt.Sprintf("%s?error=invalid_scope", req.RedirectURI)
 				}
-				if !assertRedirectURI(t, req.RedirectURI, "http", "localhost") {
+				if !assertRedirectURI(t, req.RedirectURI, "http", "localhost", "/") {
 					return fmt.Sprintf("%s?error=invalid_redirect_uri", req.RedirectURI)
 				}
 				return fmt.Sprintf("%s?state=%s&code=%s", req.RedirectURI, req.State, "AUTH_CODE")
@@ -242,7 +242,7 @@ func TestSuccessRedirect(t *testing.T) {
 	wg.Wait()
 }
 
-func assertRedirectURI(t *testing.T, actualURI, scheme, hostname string) bool {
+func assertRedirectURI(t *testing.T, actualURI, scheme, hostname, path string) bool {
 	redirect, err := url.Parse(actualURI)
 	if err != nil {
 		t.Errorf("could not parse redirect_uri: %s", err)
@@ -256,8 +256,8 @@ func assertRedirectURI(t *testing.T, actualURI, scheme, hostname string) bool {
 		t.Errorf("redirect_uri wants hostname %s but was %s", hostname, actualHostname)
 		return false
 	}
-	if redirect.Path != "" {
-		t.Errorf("redirect_uri wants path `` but was %s", redirect.Path)
+	if actualPath := redirect.Path; actualPath != path {
+		t.Errorf("redirect_uri wants path %s but was %s", path, actualPath)
 		return false
 	}
 	return true

@@ -22,7 +22,16 @@ func receiveCodeViaLocalServer(ctx context.Context, cfg *Config) (string, error)
 	defer localServerListener.Close()
 
 	localServerPort := localServerListener.Addr().(*net.TCPAddr).Port
-	cfg.OAuth2Config.RedirectURL = constructRedirectURL(cfg, localServerPort)
+	localServerURL := constructLocalServerURL(cfg, localServerPort)
+	localServerIndexURL, err := localServerURL.Parse("/")
+	if err != nil {
+		return "", fmt.Errorf("construct the index URL: %w", err)
+	}
+	localServerCallbackURL, err := localServerURL.Parse(cfg.LocalServerCallbackPath)
+	if err != nil {
+		return "", fmt.Errorf("construct the callback URL: %w", err)
+	}
+	cfg.OAuth2Config.RedirectURL = localServerCallbackURL.String()
 
 	respCh := make(chan *authorizationResponse)
 	server := http.Server{
@@ -84,7 +93,7 @@ func receiveCodeViaLocalServer(ctx context.Context, cfg *Config) (string, error)
 			return nil
 		}
 		select {
-		case cfg.LocalServerReadyChan <- cfg.OAuth2Config.RedirectURL:
+		case cfg.LocalServerReadyChan <- localServerIndexURL.String():
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
@@ -99,14 +108,14 @@ func receiveCodeViaLocalServer(ctx context.Context, cfg *Config) (string, error)
 	return resp.code, resp.err
 }
 
-func constructRedirectURL(cfg *Config, port int) string {
-	var redirect url.URL
-	redirect.Host = fmt.Sprintf("%s:%d", cfg.RedirectURLHostname, port)
-	redirect.Scheme = "http"
+func constructLocalServerURL(cfg *Config, port int) url.URL {
+	var localServer url.URL
+	localServer.Host = fmt.Sprintf("%s:%d", cfg.RedirectURLHostname, port)
+	localServer.Scheme = "http"
 	if cfg.isLocalServerHTTPS() {
-		redirect.Scheme = "https"
+		localServer.Scheme = "https"
 	}
-	return redirect.String()
+	return localServer
 }
 
 type authorizationResponse struct {
@@ -123,11 +132,11 @@ type localServerHandler struct {
 func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	switch {
-	case r.Method == "GET" && r.URL.Path == "/" && q.Get("error") != "":
+	case r.Method == "GET" && r.URL.Path == h.config.LocalServerCallbackPath && q.Get("error") != "":
 		h.onceRespCh.Do(func() {
 			h.respCh <- h.handleErrorResponse(w, r)
 		})
-	case r.Method == "GET" && r.URL.Path == "/" && q.Get("code") != "":
+	case r.Method == "GET" && r.URL.Path == h.config.LocalServerCallbackPath && q.Get("code") != "":
 		h.onceRespCh.Do(func() {
 			h.respCh <- h.handleCodeResponse(w, r)
 		})
