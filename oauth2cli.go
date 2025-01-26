@@ -85,7 +85,6 @@ type Config struct {
 
 	// Callback path of the local server.
 	// If your provider requires a specific path of the redirect URL, set it here.
-	// Default to "/".
 	LocalServerCallbackPath string
 
 	// Response HTML body on authorization completed.
@@ -123,9 +122,6 @@ func (cfg *Config) validateAndSetDefaults() error {
 			return fmt.Errorf("could not generate a state parameter: %w", err)
 		}
 		cfg.State = state
-	}
-	if cfg.LocalServerCallbackPath == "" {
-		cfg.LocalServerCallbackPath = "/"
 	}
 	if cfg.LocalServerMiddleware == nil {
 		cfg.LocalServerMiddleware = noopMiddleware

@@ -31,7 +31,7 @@ func TestTLS(t *testing.T) {
 					t.Errorf("scope wants %s but %s", want, req.Scope)
 					return fmt.Sprintf("%s?error=invalid_scope", req.RedirectURI)
 				}
-				if !assertRedirectURI(t, req.RedirectURI, "https", "localhost", "/") {
+				if !assertRedirectURI(t, req.RedirectURI, "https", "localhost", "") {
 					return fmt.Sprintf("%s?error=invalid_redirect_uri", req.RedirectURI)
 				}
 				return fmt.Sprintf("%s?state=%s&code=%s", req.RedirectURI, req.State, "AUTH_CODE")
