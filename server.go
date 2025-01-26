@@ -130,13 +130,17 @@ type localServerHandler struct {
 }
 
 func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	callbackPath := h.config.LocalServerCallbackPath
+	if callbackPath == "" {
+		callbackPath = "/"
+	}
 	q := r.URL.Query()
 	switch {
-	case r.Method == "GET" && r.URL.Path == h.config.LocalServerCallbackPath && q.Get("error") != "":
+	case r.Method == "GET" && r.URL.Path == callbackPath && q.Get("error") != "":
 		h.onceRespCh.Do(func() {
 			h.respCh <- h.handleErrorResponse(w, r)
 		})
-	case r.Method == "GET" && r.URL.Path == h.config.LocalServerCallbackPath && q.Get("code") != "":
+	case r.Method == "GET" && r.URL.Path == callbackPath && q.Get("code") != "":
 		h.onceRespCh.Do(func() {
 			h.respCh <- h.handleCodeResponse(w, r)
 		})
