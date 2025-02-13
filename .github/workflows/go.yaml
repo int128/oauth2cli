@@ -39,7 +39,9 @@ jobs:
         with:
           go-version-file: tools/go.mod
           cache-dependency-path: tools/go.sum
-      - run: make lint
+      - run: go install tool
+        working-directory: tools
+      - run: golangci-lint run
 
   generate:
     runs-on: ubuntu-latest
