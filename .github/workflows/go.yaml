@@ -22,11 +22,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - id: toolchain
-        run: echo "version=$(sed -ne '/^toolchain /s/^toolchain go//p' go.mod)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
         with:
-          go-version: ${{ steps.toolchain.outputs.version }}
+          go-version-file: go.work
           cache-dependency-path: go.sum
       - run: go test -v -race ./...
 
@@ -37,22 +35,18 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
         with:
-          go-version-file: tools/go.mod
-          cache-dependency-path: tools/go.sum
-      - run: go install tool
-        working-directory: tools
-      - run: golangci-lint run
+          go-version-file: go.work
+          cache-dependency-path: go.work.sum
+      - run: go tool github.com/golangci/golangci-lint/cmd/golangci-lint run
 
   generate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - id: toolchain
-        run: echo "version=$(sed -ne '/^toolchain /s/^toolchain go//p' go.mod)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
         with:
-          go-version: ${{ steps.toolchain.outputs.version }}
+          go-version-file: go.work
           cache-dependency-path: go.sum
       - run: go mod tidy
       - uses: int128/update-generated-files-action@65b9a7ae3ededc5679d78343f58fbebcf1ebd785 # v2.57.0
