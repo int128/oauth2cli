@@ -1,6 +1,6 @@
 module github.com/int128/oauth2cli
 
-go 1.23.0
+go 1.18
 
 toolchain go1.24.0
 
