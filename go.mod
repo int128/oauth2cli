@@ -12,7 +12,4 @@ require (
 	golang.org/x/sync v0.11.0
 )
 
-require (
-	cloud.google.com/go/compute/metadata v0.6.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-)
+require golang.org/x/sys v0.1.0 // indirect
