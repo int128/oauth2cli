@@ -12,7 +12,6 @@ import (
 	"github.com/int128/oauth2cli/oauth2params"
 	"github.com/pkg/browser"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -32,8 +31,8 @@ type cmdOptions struct {
 
 func main() {
 	var o cmdOptions
-	flag.StringVar(&o.authURL, "auth-url", google.Endpoint.AuthURL, "Authorization URL of the endpoint")
-	flag.StringVar(&o.tokenURL, "token-url", google.Endpoint.TokenURL, "Authorization URL of the endpoint")
+	flag.StringVar(&o.authURL, "auth-url", "https://accounts.google.com/o/oauth2/auth", "Authorization URL of the endpoint")
+	flag.StringVar(&o.tokenURL, "token-url", "https://oauth2.googleapis.com/token", "Authorization URL of the endpoint")
 	flag.StringVar(&o.clientID, "client-id", "", "OAuth Client ID")
 	flag.StringVar(&o.clientSecret, "client-secret", "", "OAuth Client Secret (optional)")
 	flag.StringVar(&o.scopes, "scopes", "email", "Scopes to request, comma separated")
