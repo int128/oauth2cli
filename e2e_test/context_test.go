@@ -36,7 +36,6 @@ func TestContextCancelOnWaitingForBrowser(t *testing.T) {
 				TokenURL: testServer.URL + "/token",
 			},
 		},
-		Logf: t.Logf,
 	}
 	_, err := oauth2cli.GetToken(ctx, cfg)
 	if err == nil {
@@ -73,9 +72,7 @@ func TestContextCancelOnLocalServerReadyChan(t *testing.T) {
 				TokenURL: testServer.URL + "/token",
 			},
 		},
-		LocalServerReadyChan: openBrowserCh,
-		Logf:                 t.Logf,
-	}
+		LocalServerReadyChan: openBrowserCh}
 	_, err := oauth2cli.GetToken(ctx, cfg)
 	if err == nil {
 		t.Errorf("GetToken wants error but was nil")

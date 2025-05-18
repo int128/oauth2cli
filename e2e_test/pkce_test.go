@@ -76,7 +76,6 @@ func TestPKCE(t *testing.T) {
 			},
 			LocalServerReadyChan:  openBrowserCh,
 			LocalServerMiddleware: loggingMiddleware(t),
-			Logf:                  t.Logf,
 		}
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {

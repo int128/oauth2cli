@@ -59,7 +59,6 @@ func TestTLS(t *testing.T) {
 			LocalServerKeyFile:    "testdata/server.key",
 			LocalServerReadyChan:  openBrowserCh,
 			LocalServerMiddleware: loggingMiddleware(t),
-			Logf:                  t.Logf,
 		}
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {

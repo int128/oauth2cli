@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -39,14 +40,17 @@ func receiveCodeViaLocalServer(ctx context.Context, cfg *Config) (string, error)
 			config: cfg,
 			respCh: respCh,
 		}),
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
 	}
 	shutdownCh := make(chan struct{})
 	var resp *authorizationResponse
 	var eg errgroup.Group
 	eg.Go(func() error {
 		defer close(respCh)
-		cfg.Logf("oauth2cli: starting a server at %s", localServerListener.Addr())
-		defer cfg.Logf("oauth2cli: stopped the server")
+		slog.DebugContext(ctx, "oauth2cli: starting a server", "address", localServerListener.Addr())
+		defer slog.DebugContext(ctx, "oauth2cli: stopped the server")
 		if cfg.isLocalServerHTTPS() {
 			if err := server.ServeTLS(localServerListener, cfg.LocalServerCertFile, cfg.LocalServerKeyFile); err != nil {
 				if errors.Is(err, http.ErrServerClosed) {
@@ -78,11 +82,11 @@ func receiveCodeViaLocalServer(ctx context.Context, cfg *Config) (string, error)
 		// Gracefully shutdown the server in the timeout.
 		// If the server has not started, Shutdown returns nil and this returns immediately.
 		// If Shutdown has failed, force-close the server.
-		cfg.Logf("oauth2cli: shutting down the server")
+		slog.DebugContext(ctx, "oauth2cli: shutting down the server")
 		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			cfg.Logf("oauth2cli: force-closing the server: shutdown failed: %s", err)
+			slog.DebugContext(ctx, "oauth2cli: force-closing the server", "error", err)
 			_ = server.Close()
 			return nil
 		}
@@ -153,7 +157,7 @@ func (h *localServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *localServerHandler) handleIndex(w http.ResponseWriter, r *http.Request) {
 	authCodeURL := h.config.OAuth2Config.AuthCodeURL(h.config.State, h.config.AuthCodeOptions...)
-	h.config.Logf("oauth2cli: sending redirect to %s", authCodeURL)
+	slog.DebugContext(r.Context(), "oauth2cli: sending redirect", "url", authCodeURL)
 	http.Redirect(w, r, authCodeURL, http.StatusFound)
 }
 

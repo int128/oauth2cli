@@ -62,7 +62,6 @@ func TestHappyPath(t *testing.T) {
 			},
 			LocalServerReadyChan:  openBrowserCh,
 			LocalServerMiddleware: loggingMiddleware(t),
-			Logf:                  t.Logf,
 		}
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {
@@ -132,9 +131,7 @@ func TestRedirectURLHostname(t *testing.T) {
 			},
 			RedirectURLHostname:   "127.0.0.1",
 			LocalServerReadyChan:  openBrowserCh,
-			LocalServerMiddleware: loggingMiddleware(t),
-			Logf:                  t.Logf,
-		}
+			LocalServerMiddleware: loggingMiddleware(t)}
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {
 			t.Errorf("could not get a token: %s", err)
@@ -214,9 +211,7 @@ func TestSuccessRedirect(t *testing.T) {
 			LocalServerReadyChan:  openBrowserCh,
 			LocalServerMiddleware: loggingMiddleware(t),
 			SuccessRedirectURL:    sr.URL + "/success",
-			FailureRedirectURL:    sr.URL + "/failure",
-			Logf:                  t.Logf,
-		}
+			FailureRedirectURL:    sr.URL + "/failure"}
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {
 			t.Errorf("could not get a token: %s", err)

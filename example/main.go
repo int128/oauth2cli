@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -16,6 +17,7 @@ import (
 
 func init() {
 	log.SetFlags(log.Lshortfile | log.Lmicroseconds)
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 }
 
 type cmdOptions struct {
@@ -39,7 +41,7 @@ func main() {
 	flag.StringVar(&o.localServerKey, "local-server-key", "", "Path to a key file for the local server (optional)")
 	flag.Parse()
 	if o.clientID == "" {
-		log.Printf(`You need to set oauth2 credentials.
+		slog.Error(`You need to set oauth2 credentials.
 Open https://console.cloud.google.com/apis/credentials and create a client.
 Then set the following options:`)
 		flag.PrintDefaults()
@@ -47,7 +49,7 @@ Then set the following options:`)
 		return
 	}
 	if o.localServerCert != "" {
-		log.Printf("Using the TLS certificate: %s", o.localServerCert)
+		slog.Debug(`Using the TLS certificate`, "path", o.localServerCert)
 	}
 
 	ready := make(chan string, 1)
@@ -68,7 +70,6 @@ Then set the following options:`)
 		LocalServerReadyChan: ready,
 		LocalServerCertFile:  o.localServerCert,
 		LocalServerKeyFile:   o.localServerKey,
-		Logf:                 log.Printf,
 	}
 
 	ctx := context.Background()
@@ -76,9 +77,9 @@ Then set the following options:`)
 	eg.Go(func() error {
 		select {
 		case url := <-ready:
-			log.Printf("Open %s", url)
+			slog.Info("Open", "url", url)
 			if err := browser.OpenURL(url); err != nil {
-				log.Printf("could not open the browser: %s", err)
+				slog.Error("could not open the browser", "error", err)
 			}
 			return nil
 		case <-ctx.Done():
