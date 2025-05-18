@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/int128/oauth2cli"
-	"github.com/int128/oauth2cli/oauth2params"
 	"github.com/pkg/browser"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
@@ -51,12 +50,9 @@ Then set the following options:`)
 		log.Printf("Using the TLS certificate: %s", o.localServerCert)
 	}
 
-	pkce, err := oauth2params.NewPKCE()
-	if err != nil {
-		log.Fatalf("error: %s", err)
-	}
 	ready := make(chan string, 1)
 	defer close(ready)
+	pkceVerifier := oauth2.GenerateVerifier()
 	cfg := oauth2cli.Config{
 		OAuth2Config: oauth2.Config{
 			ClientID:     o.clientID,
@@ -67,8 +63,8 @@ Then set the following options:`)
 			},
 			Scopes: strings.Split(o.scopes, ","),
 		},
-		AuthCodeOptions:      pkce.AuthCodeOptions(),
-		TokenRequestOptions:  pkce.TokenRequestOptions(),
+		AuthCodeOptions:      []oauth2.AuthCodeOption{oauth2.S256ChallengeOption(pkceVerifier)},
+		TokenRequestOptions:  []oauth2.AuthCodeOption{oauth2.VerifierOption(pkceVerifier)},
 		LocalServerReadyChan: ready,
 		LocalServerCertFile:  o.localServerCert,
 		LocalServerKeyFile:   o.localServerKey,
