@@ -54,10 +54,10 @@ type Config struct {
 	OAuth2Config oauth2.Config
 
 	// Options for an authorization request.
-	// You can set oauth2.AccessTypeOffline and the PKCE options here.
+	// You can set oauth2.AccessTypeOffline or oauth2.S256ChallengeOption.
 	AuthCodeOptions []oauth2.AuthCodeOption
 	// Options for a token request.
-	// You can set the PKCE options here.
+	// You can set oauth2.VerifierOption.
 	TokenRequestOptions []oauth2.AuthCodeOption
 	// State parameter in the authorization request.
 	// Default to a string of random 32 bytes.
