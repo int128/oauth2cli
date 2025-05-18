@@ -50,22 +50,23 @@ const DefaultLocalServerSuccessHTML = `
 // Config represents a config for GetToken.
 type Config struct {
 	// OAuth2 config.
-	// RedirectURL will be automatically set to the local server.
+	// If the RedirectURL field is not set, default to http://localhost with the allocated port and LocalServerCallbackPath.
+	// If the RedirectURL field is set, make sure it matches the LocalServerBindAddress and LocalServerCallbackPath.
 	OAuth2Config oauth2.Config
 
 	// Options for an authorization request.
 	// You can set oauth2.AccessTypeOffline or oauth2.S256ChallengeOption.
 	AuthCodeOptions []oauth2.AuthCodeOption
+
 	// Options for a token request.
 	// You can set oauth2.VerifierOption.
 	TokenRequestOptions []oauth2.AuthCodeOption
+
 	// State parameter in the authorization request.
 	// Default to a string of random 32 bytes.
 	State string
 
-	// Hostname of the redirect URL.
-	// You can set this if your provider does not accept localhost.
-	// Default to localhost.
+	// DEPRECATED: Set OAuth2Config.RedirectURL instead.
 	RedirectURLHostname string
 
 	// Candidates of hostname and port which the local server binds to.
@@ -79,24 +80,31 @@ type Config struct {
 	// certificates. It's recommended that the public key's SANs contain
 	// the loopback addresses - 'localhost', '127.0.0.1' and '::1'
 	LocalServerCertFile string
+
 	// A PEM-encoded private key for the certificate.
 	// This is required when LocalServerCertFile is set.
 	LocalServerKeyFile string
 
 	// Callback path of the local server.
-	// If your provider requires a specific path of the redirect URL, set it here.
+	// If your provider requires a specific path of the redirect URL, set this field.
+	// Default to none.
 	LocalServerCallbackPath string
 
 	// Response HTML body on authorization completed.
 	// Default to DefaultLocalServerSuccessHTML.
 	LocalServerSuccessHTML string
-	// Middleware for the local server. Default to none.
+
+	// Middleware for the local server.
+	// Default to none.
 	LocalServerMiddleware func(h http.Handler) http.Handler
-	// A channel to send its URL when the local server is ready. Default to none.
+
+	// A channel to send the local server URL when it is ready.
+	// Default to none.
 	LocalServerReadyChan chan<- string
 
 	// Redirect URL upon successful login
 	SuccessRedirectURL string
+
 	// Redirect URL upon failed login
 	FailureRedirectURL string
 
@@ -112,9 +120,6 @@ func (cfg *Config) validateAndSetDefaults() error {
 	if (cfg.LocalServerCertFile != "" && cfg.LocalServerKeyFile == "") ||
 		(cfg.LocalServerCertFile == "" && cfg.LocalServerKeyFile != "") {
 		return fmt.Errorf("both LocalServerCertFile and LocalServerKeyFile must be set")
-	}
-	if cfg.RedirectURLHostname == "" {
-		cfg.RedirectURLHostname = "localhost"
 	}
 	if cfg.State == "" {
 		state, err := oauth2params.NewState()
