@@ -46,7 +46,6 @@ func TestErrorAuthorizationResponse(t *testing.T) {
 				},
 			},
 			LocalServerReadyChan: openBrowserCh,
-			Logf:                 t.Logf,
 		}
 		_, err := oauth2cli.GetToken(ctx, cfg)
 		if err == nil {
@@ -113,9 +112,7 @@ func TestFailureRedirect(t *testing.T) {
 			},
 			LocalServerReadyChan: openBrowserCh,
 			SuccessRedirectURL:   pageServer.URL + "/success",
-			FailureRedirectURL:   pageServer.URL + "/failure",
-			Logf:                 t.Logf,
-		}
+			FailureRedirectURL:   pageServer.URL + "/failure"}
 		_, err := oauth2cli.GetToken(ctx, cfg)
 		if err == nil {
 			t.Errorf("GetToken wants error but was nil")
@@ -166,9 +163,7 @@ func TestErrorTokenResponse(t *testing.T) {
 					TokenURL: testServer.URL + "/token",
 				},
 			},
-			LocalServerReadyChan: openBrowserCh,
-			Logf:                 t.Logf,
-		}
+			LocalServerReadyChan: openBrowserCh}
 		_, err := oauth2cli.GetToken(ctx, cfg)
 		if err == nil {
 			t.Errorf("GetToken wants error but nil")

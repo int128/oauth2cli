@@ -58,7 +58,6 @@ func TestLocalServerCallbackPath(t *testing.T) {
 			LocalServerCallbackPath: "/callback",
 			LocalServerReadyChan:    openBrowserCh,
 			LocalServerMiddleware:   loggingMiddleware(t),
-			Logf:                    t.Logf,
 		}
 		token, err := oauth2cli.GetToken(ctx, cfg)
 		if err != nil {

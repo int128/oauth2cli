@@ -5,6 +5,7 @@ package oauth2cli
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/int128/oauth2cli/oauth2params"
@@ -99,9 +100,6 @@ type Config struct {
 	SuccessRedirectURL string
 	// Redirect URL upon failed login
 	FailureRedirectURL string
-
-	// Logger function for debug.
-	Logf func(format string, args ...interface{})
 }
 
 func (cfg *Config) isLocalServerHTTPS() bool {
@@ -133,9 +131,6 @@ func (cfg *Config) validateAndSetDefaults() error {
 		(cfg.SuccessRedirectURL == "" && cfg.FailureRedirectURL != "") {
 		return fmt.Errorf("when using success and failure redirect URLs, set both URLs")
 	}
-	if cfg.Logf == nil {
-		cfg.Logf = func(string, ...interface{}) {}
-	}
 	return nil
 }
 
@@ -158,7 +153,7 @@ func GetToken(ctx context.Context, cfg Config) (*oauth2.Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("authorization error: %w", err)
 	}
-	cfg.Logf("oauth2cli: exchanging the code and token")
+	slog.DebugContext(ctx, "oauth2cli: exchanging the code and token")
 	token, err := cfg.OAuth2Config.Exchange(ctx, code, cfg.TokenRequestOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("could not exchange the code and token: %w", err)
