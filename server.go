@@ -21,17 +21,29 @@ func receiveCodeViaLocalServer(ctx context.Context, cfg *Config) (string, error)
 	}
 	defer localServerListener.Close()
 
-	localServerPort := localServerListener.Addr().(*net.TCPAddr).Port
-	localServerURL := constructLocalServerURL(cfg, localServerPort)
-	localServerIndexURL, err := localServerURL.Parse("/")
+	if cfg.OAuth2Config.RedirectURL == "" {
+		var localServerURL url.URL
+		localServerHostname := "localhost"
+		if cfg.RedirectURLHostname != "" {
+			localServerHostname = cfg.RedirectURLHostname
+		}
+		localServerURL.Host = fmt.Sprintf("%s:%d", localServerHostname, localServerListener.Addr().(*net.TCPAddr).Port)
+		localServerURL.Scheme = "http"
+		if cfg.isLocalServerHTTPS() {
+			localServerURL.Scheme = "https"
+		}
+		localServerURL.Path = cfg.LocalServerCallbackPath
+		cfg.OAuth2Config.RedirectURL = localServerURL.String()
+	}
+
+	oauth2RedirectURL, err := url.Parse(cfg.OAuth2Config.RedirectURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid OAuth2Config.RedirectURL: %w", err)
+	}
+	localServerIndexURL, err := oauth2RedirectURL.Parse("/")
 	if err != nil {
 		return "", fmt.Errorf("construct the index URL: %w", err)
 	}
-	localServerCallbackURL, err := localServerURL.Parse(cfg.LocalServerCallbackPath)
-	if err != nil {
-		return "", fmt.Errorf("construct the callback URL: %w", err)
-	}
-	cfg.OAuth2Config.RedirectURL = localServerCallbackURL.String()
 
 	respCh := make(chan *authorizationResponse)
 	server := http.Server{
@@ -106,16 +118,6 @@ func receiveCodeViaLocalServer(ctx context.Context, cfg *Config) (string, error)
 		return "", errors.New("no authorization response")
 	}
 	return resp.code, resp.err
-}
-
-func constructLocalServerURL(cfg *Config, port int) url.URL {
-	var localServer url.URL
-	localServer.Host = fmt.Sprintf("%s:%d", cfg.RedirectURLHostname, port)
-	localServer.Scheme = "http"
-	if cfg.isLocalServerHTTPS() {
-		localServer.Scheme = "https"
-	}
-	return localServer
 }
 
 type authorizationResponse struct {
