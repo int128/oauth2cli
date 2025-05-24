@@ -19,7 +19,10 @@ func receiveCodeViaLocalServer(ctx context.Context, cfg *Config) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("could not start a local server: %w", err)
 	}
-	defer localServerListener.Close()
+	defer func() {
+		// The listener may be closed by the server. No need to check the error.
+		_ = localServerListener.Close()
+	}()
 
 	if cfg.OAuth2Config.RedirectURL == "" {
 		var localServerURL url.URL
