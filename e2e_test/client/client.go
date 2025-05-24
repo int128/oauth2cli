@@ -30,7 +30,11 @@ func Get(url string) (int, string, error) {
 	if err != nil {
 		return 0, "", fmt.Errorf("could not send a request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			panic(err)
+		}
+	}()
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return resp.StatusCode, "", fmt.Errorf("could not read response body: %w", err)
