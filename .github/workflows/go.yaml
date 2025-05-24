@@ -28,7 +28,7 @@ jobs:
         with:
           go-version: ${{ steps.toolchain.outputs.version }}
           cache-dependency-path: go.sum
-      - run: go test -v -race ./...
+      - run: make test
 
   lint:
     runs-on: ubuntu-latest
@@ -41,10 +41,7 @@ jobs:
         with:
           go-version: ${{ steps.toolchain.outputs.version }}
           cache-dependency-path: go.sum
-      - uses: aquaproj/aqua-installer@9ebf656952a20c45a5d66606f083ff34f58b8ce0 # v4.0.0
-        with:
-          aqua_version: v2.51.2
-      - run: golangci-lint run
+      - run: make lint
 
   generate:
     runs-on: ubuntu-latest

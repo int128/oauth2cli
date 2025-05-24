@@ -4,7 +4,6 @@
     "github>int128/renovate-base",
     "github>int128/go-renovate-config#v1.7.2",
     "github>int128/go-renovate-config:github-actions#v1.7.2",
-    "github>aquaproj/aqua-renovate-config#2.8.0",
     "helpers:pinGitHubActionDigests",
   ],
   "packageRules": [
