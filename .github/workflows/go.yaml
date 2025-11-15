@@ -57,4 +57,4 @@ jobs:
           go-version: ${{ steps.toolchain.outputs.version }}
           cache-dependency-path: go.sum
       - run: go mod tidy
-      - uses: int128/update-generated-files-action@57b7ce80d0aca361f4dc61f09717043daa7d0956 # v2.65.0
+      - uses: int128/update-generated-files-action@cf6ab7b6285ba87a853c47d593af367ea06c8e40 # v2.66.0
