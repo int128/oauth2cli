@@ -24,26 +24,31 @@ func receiveCodeViaLocalServer(ctx context.Context, cfg *Config) (string, error)
 		_ = localServerListener.Close()
 	}()
 
+	path := ""
 	if cfg.OAuth2Config.RedirectURL == "" {
-		var localServerURL url.URL
-		localServerHostname := "localhost"
-		if cfg.RedirectURLHostname != "" {
-			localServerHostname = cfg.RedirectURLHostname
+		cfg.OAuth2Config.RedirectURL = localServerListener.URL.String()
+		switch localServerListener.Addr().(type) {
+		case *net.TCPAddr:
+			var localServerURL url.URL
+			localServerHostname := "localhost"
+			if cfg.RedirectURLHostname != "" {
+				localServerHostname = cfg.RedirectURLHostname
+			}
+			localServerURL.Host = fmt.Sprintf("%s:%d", localServerHostname, localServerListener.Addr().(*net.TCPAddr).Port)
+			localServerURL.Scheme = "http"
+			if cfg.isLocalServerHTTPS() {
+				localServerURL.Scheme = "https"
+			}
+			localServerURL.Path = cfg.LocalServerCallbackPath
+			cfg.OAuth2Config.RedirectURL = localServerURL.String()
+			path = "/"
 		}
-		localServerURL.Host = fmt.Sprintf("%s:%d", localServerHostname, localServerListener.Addr().(*net.TCPAddr).Port)
-		localServerURL.Scheme = "http"
-		if cfg.isLocalServerHTTPS() {
-			localServerURL.Scheme = "https"
-		}
-		localServerURL.Path = cfg.LocalServerCallbackPath
-		cfg.OAuth2Config.RedirectURL = localServerURL.String()
 	}
-
 	oauth2RedirectURL, err := url.Parse(cfg.OAuth2Config.RedirectURL)
 	if err != nil {
 		return "", fmt.Errorf("invalid OAuth2Config.RedirectURL: %w", err)
 	}
-	localServerIndexURL, err := oauth2RedirectURL.Parse("/")
+	localServerIndexURL, err := oauth2RedirectURL.Parse(path)
 	if err != nil {
 		return "", fmt.Errorf("construct the index URL: %w", err)
 	}
