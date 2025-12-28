@@ -3,20 +3,20 @@
   "extends": [
     "github>int128/renovate-base",
     "github>int128/go-renovate-config#v1.9.0",
-    "helpers:pinGitHubActionDigests",
+    "helpers:pinGitHubActionDigests"
   ],
   "packageRules": [
     {
       "description": "Update go version",
       "matchDatasources": ["golang-version"],
-      "rangeStrategy": "bump",
+      "rangeStrategy": "bump"
     },
     {
       "description": "Do not update go directive in go.mod",
       "matchDatasources": ["golang-version"],
       "matchDepTypes": ["golang"],
       "matchFileNames": ["go.mod"],
-      "enabled": false,
-    },
-  ],
+      "enabled": false
+    }
+  ]
 }
