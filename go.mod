@@ -2,7 +2,7 @@ module github.com/int128/oauth2cli
 
 go 1.25.0
 
-toolchain go1.26.6
+toolchain go1.27.0
 
 require (
 	github.com/google/go-cmp v0.7.0
